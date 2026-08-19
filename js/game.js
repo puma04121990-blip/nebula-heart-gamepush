@@ -1,28 +1,29 @@
 (function () {
+  var LANG_KEY = 'nebula-heart-lang';
   var FORMS = [
-    { name: 'Искра пустоты', need: 0, color: '#7cf6ff' },
-    { name: 'Туманный сгусток', need: 250, color: '#8ab4ff' },
-    { name: 'Пульсарное сердце', need: 4000, color: '#c084fc' },
-    { name: 'Страж новы', need: 60000, color: '#ff9ad5' },
-    { name: 'Галактическое ядро', need: 9e5, color: '#ffb86b' },
-    { name: 'Вечная туманность', need: 1.2e7, color: '#7dffb3' }
+    { need: 0, color: '#7cf6ff' },
+    { need: 250, color: '#8ab4ff' },
+    { need: 4000, color: '#c084fc' },
+    { need: 60000, color: '#ff9ad5' },
+    { need: 9e5, color: '#ffb86b' },
+    { need: 1.2e7, color: '#7dffb3' }
   ];
 
   var ORBITS = [
-    { name: 'Пылевой вихрь', desc: 'Мелкая орбита собирает пыль', base: 15, prod: 0.1 },
-    { name: 'Осколок звезды', desc: 'Осколки падают в ядро', base: 100, prod: 1 },
-    { name: 'Кольцо пульсара', desc: 'Ритмичный поток энергии', base: 1100, prod: 8 },
-    { name: 'Квазарный колодец', desc: 'Тяжёлые частицы из ядра галактики', base: 12000, prod: 47 },
-    { name: 'Горизонт событий', desc: 'Гравитация тянет пыль из пустоты', base: 130000, prod: 260 },
-    { name: 'Ткацкий станок', desc: 'Плетёт рукава млечного пути', base: 1.4e6, prod: 1400 }
+    { base: 15, prod: 0.1 },
+    { base: 100, prod: 1 },
+    { base: 1100, prod: 8 },
+    { base: 12000, prod: 47 },
+    { base: 130000, prod: 260 },
+    { base: 1.4e6, prod: 1400 }
   ];
 
   var HARMONIES = [
-    { name: 'Мягкий импульс', desc: '+1 к силе настройки', base: 20, kind: 'click', val: 1 },
-    { name: 'Фокус линзы', desc: '+5 к силе настройки', base: 250, kind: 'click', val: 5 },
-    { name: 'Гравитационный хор', desc: '+10% ко всему потоку', base: 800, kind: 'mult', val: 0.1 },
-    { name: 'Синхротрон фаз', desc: '+25 к силе настройки', base: 4000, kind: 'click', val: 25 },
-    { name: 'Кольцо согласия', desc: '+25% ко всему потоку', base: 25000, kind: 'mult', val: 0.25 }
+    { base: 20, kind: 'click', val: 1 },
+    { base: 250, kind: 'click', val: 5 },
+    { base: 800, kind: 'mult', val: 0.1 },
+    { base: 4000, kind: 'click', val: 25 },
+    { base: 25000, kind: 'mult', val: 0.25 }
   ];
 
   var COLLAPSE_NEED = 1e6;
@@ -36,6 +37,7 @@
     gravity: 0,
     last: Date.now(),
     sound: true,
+    lang: 'ru',
     welcome: false
   };
 
@@ -43,6 +45,7 @@
   var combo = 0;
   var comboUntil = 0;
   var shopTab = 'orbits';
+  var sheetKind = '';
   var lastTick = Date.now();
   var saveTimer = 0;
 
@@ -63,6 +66,53 @@
     sheetBody: document.getElementById('sheetBody'),
     toast: document.getElementById('toast')
   };
+
+  function dict() {
+    return (window.I18N && window.I18N[state.lang]) || window.I18N.ru;
+  }
+
+  function t(key, vars) {
+    var s = dict()[key];
+    if (s == null) s = key;
+    if (vars) {
+      Object.keys(vars).forEach(function (k) {
+        s = String(s).replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]);
+      });
+    }
+    return s;
+  }
+
+  function detectLang() {
+    try {
+      var saved = localStorage.getItem(LANG_KEY);
+      if (saved === 'ru' || saved === 'en') return saved;
+    } catch (e) {}
+    var gpLang = typeof GPX !== 'undefined' ? GPX.platformLang() : '';
+    if (gpLang === 'ru' || gpLang === 'en') return gpLang;
+    var nav = (navigator.language || 'ru').slice(0, 2).toLowerCase();
+    return nav === 'en' ? 'en' : 'ru';
+  }
+
+  function applyStaticI18n() {
+    document.documentElement.lang = state.lang;
+    document.title = t('title');
+    document.querySelectorAll('[data-i18n]').forEach(function (node) {
+      node.textContent = t(node.getAttribute('data-i18n'));
+    });
+    document.querySelectorAll('[data-i18n-aria]').forEach(function (node) {
+      node.setAttribute('aria-label', t(node.getAttribute('data-i18n-aria')));
+    });
+  }
+
+  function setLang(code) {
+    state.lang = code === 'en' ? 'en' : 'ru';
+    try { localStorage.setItem(LANG_KEY, state.lang); } catch (e) {}
+    if (typeof GPX !== 'undefined') GPX.setLanguage(state.lang);
+    applyStaticI18n();
+    persist();
+    renderHud();
+    if (!el.sheet.classList.contains('hidden')) refreshOpenSheet();
+  }
 
   function fmt(n) {
     if (!isFinite(n)) return '0';
@@ -124,9 +174,9 @@
   }
 
   function applyTheme() {
-    var f = FORMS[formIndex()];
-    document.documentElement.style.setProperty('--core', f.color);
-    el.form.textContent = f.name;
+    var i = formIndex();
+    document.documentElement.style.setProperty('--core', FORMS[i].color);
+    el.form.textContent = t('forms')[i];
   }
 
   function toast(text) {
@@ -181,6 +231,7 @@
       gravity: state.gravity,
       last: state.last,
       sound: state.sound,
+      lang: state.lang,
       welcome: state.welcome
     };
     GPX.saveProgress(snap, scoreValue());
@@ -195,6 +246,7 @@
     state.gravity = data.gravity || 0;
     state.sound = data.sound !== false;
     state.welcome = !!data.welcome;
+    if (data.lang === 'en' || data.lang === 'ru') state.lang = data.lang;
     var dt = Math.min(OFFLINE_CAP, Math.max(0, (Date.now() - (data.last || Date.now())) / 1000));
     var gained = perSec() * dt;
     if (gained > 1) {
@@ -206,20 +258,26 @@
 
   function renderHud() {
     el.dust.textContent = fmt(state.dust);
-    el.rate.textContent = fmt(perSec()) + ' / сек';
+    el.rate.textContent = fmt(perSec()) + ' ' + t('perSec');
     var p = evoProgress();
-    el.evo.textContent = formIndex() >= FORMS.length - 1 ? 'Предел формы' : ('Фаза ' + Math.floor(p * 100) + '%');
+    el.evo.textContent = formIndex() >= FORMS.length - 1
+      ? t('formCap')
+      : (t('phase') + ' ' + Math.floor(p * 100) + '%');
     el.evoFill.style.width = (p * 100) + '%';
     if (Date.now() < comboUntil && combo > 1) {
       el.combo.classList.remove('hidden');
-      el.combo.textContent = 'резонанс ×' + comboMult().toFixed(2);
+      el.combo.textContent = t('resonance') + ' ×' + comboMult().toFixed(2);
     } else el.combo.classList.add('hidden');
     applyTheme();
   }
 
-  function closeSheet() { el.sheet.classList.add('hidden'); }
+  function closeSheet() {
+    sheetKind = '';
+    el.sheet.classList.add('hidden');
+  }
 
-  function openSheet(title, html) {
+  function openSheet(kind, title, html) {
+    sheetKind = kind;
     el.sheetTitle.textContent = title;
     el.sheetBody.innerHTML = html;
     el.sheet.classList.remove('hidden');
@@ -227,63 +285,84 @@
 
   function shopHtml() {
     var tabs = '<div class="tabs">' +
-      '<button data-tab="orbits" class="' + (shopTab === 'orbits' ? 'on' : '') + '">Орбиты</button>' +
-      '<button data-tab="harm" class="' + (shopTab === 'harm' ? 'on' : '') + '">Гармонии</button></div>';
+      '<button data-tab="orbits" class="' + (shopTab === 'orbits' ? 'on' : '') + '">' + t('orbits') + '</button>' +
+      '<button data-tab="harm" class="' + (shopTab === 'harm' ? 'on' : '') + '">' + t('harmonies') + '</button></div>';
     var list = '';
     if (shopTab === 'orbits') {
       ORBITS.forEach(function (o, i) {
         var c = costOf(o.base, state.orbits[i]);
         var can = state.dust >= c;
-        list += '<div class="shop-item"><div><h3>' + o.name + ' · ' + state.orbits[i] +
-          '</h3><p>' + o.desc + ' · +' + fmt(o.prod * flowMult()) + '/сек</p></div>' +
+        list += '<div class="shop-item"><div><h3>' + t('orbitNames')[i] + ' · ' + state.orbits[i] +
+          '</h3><p>' + t('orbitDesc')[i] + ' · +' + fmt(o.prod * flowMult()) + t('perSec') + '</p></div>' +
           '<button data-buy-orbit="' + i + '" class="' + (can ? 'ok' : '') + '">' + fmt(c) + '</button></div>';
       });
     } else {
       HARMONIES.forEach(function (h, i) {
         var c = costOf(h.base, state.harms[i]);
         var can = state.dust >= c;
-        list += '<div class="shop-item"><div><h3>' + h.name + ' · ' + state.harms[i] +
-          '</h3><p>' + h.desc + '</p></div>' +
+        list += '<div class="shop-item"><div><h3>' + t('harmNames')[i] + ' · ' + state.harms[i] +
+          '</h3><p>' + t('harmDesc')[i] + '</p></div>' +
           '<button data-buy-harm="' + i + '" class="' + (can ? 'ok' : '') + '">' + fmt(c) + '</button></div>';
       });
     }
     return tabs + list;
   }
 
-  function refreshShopIfOpen() {
-    if (el.sheet.classList.contains('hidden')) return;
-    if (el.sheetTitle.textContent === 'Мастерская') {
-      el.sheetBody.innerHTML = shopHtml();
-    }
-  }
-
   function collapseHtml() {
     var ready = state.total >= COLLAPSE_NEED;
     var next = gravityMult() + 0.5;
-    return '<p class="note">Сжать ядро в сингулярность. Текущая пыль и орбиты обнулятся, но гравитация останется навсегда.</p>' +
-      '<p>Текущая гравитация: <strong>×' + gravityMult().toFixed(2) + '</strong></p>' +
-      '<p>После коллапса: <strong>×' + next.toFixed(2) + '</strong></p>' +
-      '<p class="note">Нужно собрать ' + fmt(COLLAPSE_NEED) + ' пыли за этот цикл · сейчас: ' + fmt(state.total) + '</p>' +
+    return '<p class="note">' + t('collapseNote') + '</p>' +
+      '<p>' + t('gravityNow') + ': <strong>×' + gravityMult().toFixed(2) + '</strong></p>' +
+      '<p>' + t('gravityAfter') + ': <strong>×' + next.toFixed(2) + '</strong></p>' +
+      '<p class="note">' + t('collapseNeed', { need: fmt(COLLAPSE_NEED), now: fmt(state.total) }) + '</p>' +
       (ready
-        ? '<button class="menu-item" data-do-collapse="1">Запустить коллапс (+0.5×)</button>'
-        : '<p class="warn">Ядро ещё слишком лёгкое для сжатия.</p>');
+        ? '<button class="menu-item" data-do-collapse="1">' + t('doCollapse') + '</button>'
+        : '<p class="warn">' + t('tooLight') + '</p>');
   }
 
   function menuHtml() {
-    return '<button class="menu-item" data-act="sound">Звук: ' + (state.sound ? 'вкл' : 'выкл') + '</button>' +
-      '<button class="menu-item" data-act="board">Таблица лидеров</button>' +
-      '<button class="menu-item" data-act="invite">Пригласить</button>' +
-      '<button class="menu-item" data-act="fav">В избранное</button>' +
-      '<button class="menu-item" data-act="about">О игре</button>' +
-      '<button class="menu-item" data-act="privacy">Политика конфиденциальности</button>' +
-      '<button class="menu-item" data-act="reset">Сбросить прогресс</button>';
+    return '<button class="menu-item" data-act="settings">' + t('settings') + '</button>' +
+      '<button class="menu-item" data-act="board">' + t('board') + '</button>' +
+      '<button class="menu-item" data-act="invite">' + t('invite') + '</button>' +
+      '<button class="menu-item" data-act="fav">' + t('fav') + '</button>' +
+      '<button class="menu-item" data-act="about">' + t('about') + '</button>' +
+      '<button class="menu-item" data-act="privacy">' + t('privacy') + '</button>' +
+      '<button class="menu-item" data-act="reset">' + t('reset') + '</button>';
+  }
+
+  function settingsHtml() {
+    return '<div class="set-row">' +
+      '<div><strong>' + t('sound') + '</strong><span>' +
+      (state.sound ? t('soundOn') : t('soundOff')) + '</span></div>' +
+      '<button class="menu-item" data-act="sound" style="width:auto;min-width:88px">' +
+      (state.sound ? t('soundOn') : t('soundOff')) + '</button></div>' +
+      '<div class="set-row">' +
+      '<div><strong>' + t('language') + '</strong></div>' +
+      '<div class="lang-switch">' +
+      '<button data-lang="ru" class="' + (state.lang === 'ru' ? 'on' : '') + '">' + t('langRu') + '</button>' +
+      '<button data-lang="en" class="' + (state.lang === 'en' ? 'on' : '') + '">' + t('langEn') + '</button>' +
+      '</div></div>' +
+      '<button class="menu-item" data-act="menu">' + t('back') + '</button>';
   }
 
   function aboutHtml() {
-    return '<p class="note"><strong>Сердце Туманности</strong> — idle-игра: настраивайте живое ядро, раскручивайте орбиты и сжимайте станцию в коллапсе.</p>' +
-      '<p class="note">Резонанс усиливает серию быстрых настроек. Возраст 0+ · версия 1.0</p>' +
-      '<p class="note">Прогресс сохраняется локально и в облаке GamePush, если SDK подключён.</p>' +
-      '<button class="menu-item" data-act="menu">Назад</button>';
+    return '<p class="note"><strong>' + t('title') + '</strong> — ' + t('about1') + '</p>' +
+      '<p class="note">' + t('about2') + '</p>' +
+      '<p class="note">' + t('about3') + '</p>' +
+      '<button class="menu-item" data-act="menu">' + t('back') + '</button>';
+  }
+
+  function refreshOpenSheet() {
+    if (el.sheet.classList.contains('hidden')) return;
+    if (sheetKind === 'shop') openSheet('shop', t('workshop'), shopHtml());
+    else if (sheetKind === 'collapse') openSheet('collapse', t('collapse'), collapseHtml());
+    else if (sheetKind === 'menu') openSheet('menu', t('menu'), menuHtml());
+    else if (sheetKind === 'settings') openSheet('settings', t('settings'), settingsHtml());
+    else if (sheetKind === 'about') openSheet('about', t('about'), aboutHtml());
+  }
+
+  function refreshShopIfOpen() {
+    if (sheetKind === 'shop') el.sheetBody.innerHTML = shopHtml();
   }
 
   function doCollapse() {
@@ -296,18 +375,20 @@
     combo = 0;
     persist();
     closeSheet();
-    toast('Коллапс состоялся. Гравитация ×' + gravityMult().toFixed(2));
+    toast(t('collapsed', { n: gravityMult().toFixed(2) }));
     renderHud();
     GPX.showFullscreen();
   }
 
   function hardReset() {
-    if (!confirm('Обнулить всё, включая гравитацию?')) return;
+    if (!confirm(t('resetAsk'))) return;
+    var keepLang = state.lang;
+    var keepSound = state.sound;
     state = {
       dust: 0, total: 0,
       orbits: ORBITS.map(function () { return 0; }),
       harms: HARMONIES.map(function () { return 0; }),
-      gravity: 0, last: Date.now(), sound: state.sound, welcome: true
+      gravity: 0, last: Date.now(), sound: keepSound, lang: keepLang, welcome: true
     };
     persist();
     closeSheet();
@@ -329,10 +410,10 @@
 
   document.getElementById('btnShop').addEventListener('click', function () {
     shopTab = 'orbits';
-    openSheet('Мастерская', shopHtml());
+    openSheet('shop', t('workshop'), shopHtml());
   });
   document.getElementById('btnCollapse').addEventListener('click', function () {
-    openSheet('Коллапс', collapseHtml());
+    openSheet('collapse', t('collapse'), collapseHtml());
   });
   document.getElementById('btnReward').addEventListener('click', async function () {
     var ok = await GPX.showRewarded();
@@ -341,13 +422,13 @@
       addDust(gift, true);
       persist();
       renderHud();
-      toast('Квант принёс +' + fmt(gift) + ' пыли');
+      toast(t('rewardOk', { n: fmt(gift) }));
     } else {
-      toast(GPX.has() ? 'Ролик недоступен' : 'Подключите GamePush, чтобы смотреть ролик');
+      toast(GPX.has() ? t('rewardFail') : t('rewardNoSdk'));
     }
   });
   document.getElementById('btnMenu').addEventListener('click', function () {
-    openSheet('Меню', menuHtml());
+    openSheet('menu', t('menu'), menuHtml());
   });
   document.getElementById('sheetClose').addEventListener('click', closeSheet);
   el.sheet.addEventListener('click', function (e) {
@@ -355,15 +436,21 @@
   });
 
   el.sheetBody.addEventListener('click', function (e) {
-    var t = e.target;
-    if (!(t instanceof HTMLElement)) return;
-    if (t.dataset.tab) {
-      shopTab = t.dataset.tab;
+    var node = e.target;
+    if (!(node instanceof HTMLElement)) return;
+    var tbtn = node.closest('[data-tab],[data-buy-orbit],[data-buy-harm],[data-do-collapse],[data-act],[data-lang]');
+    if (!tbtn) return;
+    if (tbtn.dataset.tab) {
+      shopTab = tbtn.dataset.tab;
       el.sheetBody.innerHTML = shopHtml();
       return;
     }
-    if (t.dataset.buyOrbit != null) {
-      var i = +t.dataset.buyOrbit;
+    if (tbtn.dataset.lang) {
+      setLang(tbtn.dataset.lang);
+      return;
+    }
+    if (tbtn.dataset.buyOrbit != null) {
+      var i = +tbtn.dataset.buyOrbit;
       var c = costOf(ORBITS[i].base, state.orbits[i]);
       if (state.dust < c) return;
       state.dust -= c;
@@ -373,8 +460,8 @@
       el.sheetBody.innerHTML = shopHtml();
       return;
     }
-    if (t.dataset.buyHarm != null) {
-      var j = +t.dataset.buyHarm;
+    if (tbtn.dataset.buyHarm != null) {
+      var j = +tbtn.dataset.buyHarm;
       var ch = costOf(HARMONIES[j].base, state.harms[j]);
       if (state.dust < ch) return;
       state.dust -= ch;
@@ -384,26 +471,28 @@
       el.sheetBody.innerHTML = shopHtml();
       return;
     }
-    if (t.dataset.doCollapse) { doCollapse(); return; }
-    switch (t.dataset.act) {
+    if (tbtn.dataset.doCollapse) { doCollapse(); return; }
+    switch (tbtn.dataset.act) {
+      case 'settings':
+        openSheet('settings', t('settings'), settingsHtml()); break;
       case 'sound':
-        state.sound = !state.sound; persist(); el.sheetBody.innerHTML = menuHtml(); break;
+        state.sound = !state.sound; persist(); refreshOpenSheet(); break;
       case 'board':
-        if (!GPX.openLeaderboard()) toast('Лидерборд появится после подключения GamePush');
+        if (!GPX.openLeaderboard()) toast(t('noBoard'));
         break;
       case 'invite':
-        if (!GPX.invite()) toast('Приглашение доступно на социальных площадках');
+        if (!GPX.invite(t('share'))) toast(t('noInvite'));
         break;
       case 'fav':
-        if (!GPX.addFavorite()) toast('Избранное добавит площадка');
+        if (!GPX.addFavorite()) toast(t('noFav'));
         break;
       case 'about':
-        openSheet('О игре', aboutHtml()); break;
+        openSheet('about', t('about'), aboutHtml()); break;
       case 'privacy':
-        if (!GPX.openPrivacy()) toast('Документ включается в панели GamePush');
+        if (!GPX.openPrivacy()) toast(t('noPrivacy'));
         break;
       case 'reset': hardReset(); break;
-      case 'menu': openSheet('Меню', menuHtml()); break;
+      case 'menu': openSheet('menu', t('menu'), menuHtml()); break;
     }
   });
 
@@ -428,20 +517,28 @@
 
   function bootAnim(done) {
     var p = 8;
-    var t = setInterval(function () {
+    var tmr = setInterval(function () {
       p += 10 + Math.random() * 18;
-      if (p >= 100) { p = 100; clearInterval(t); done(); }
+      if (p >= 100) { p = 100; clearInterval(tmr); done(); }
       el.fill.style.width = p + '%';
     }, 160);
   }
 
+  state.lang = detectLang();
+  applyStaticI18n();
+
   bootAnim(function () {
     GPX.whenReady(function () {
+      if (!localStorage.getItem(LANG_KEY)) {
+        var gpLang = GPX.platformLang();
+        if (gpLang === 'ru' || gpLang === 'en') state.lang = gpLang;
+      }
       var offline = hydrate(GPX.loadProgress());
+      applyStaticI18n();
       el.boot.classList.add('hidden');
       el.app.classList.remove('hidden');
       renderHud();
-      if (offline > 1) toast('Пока вас не было, ядро собрало ' + fmt(offline) + ' пыли');
+      if (offline > 1) toast(t('offline', { n: fmt(offline) }));
       persist();
       lastTick = Date.now();
       tick();
