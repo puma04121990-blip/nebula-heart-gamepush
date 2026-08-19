@@ -94,6 +94,20 @@ html, body {
 }
 .stage-meta { text-align: center; margin-bottom: 8px; }
 #formName { font-size: 1.15rem; font-weight: 650; }
+.chip {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.chip.high { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.chip.ebb { color: var(--warn); }
+.chip.rift { color: #ffd27a; border-color: #ffd27a66; animation: pulse .8s ease-in-out infinite; }
 .evo-row { margin-top: 6px; color: var(--mute); font-size: 13px; }
 .evo-bar {
   width: min(240px, 70vw); height: 6px; margin: 6px auto 0;
@@ -117,7 +131,7 @@ html, body {
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff, var(--core) 38%, #1b3a7a 72%, #050814 100%);
   box-shadow: 0 0 30px color-mix(in srgb, var(--core) 55%, transparent);
-  transition: transform .08s ease;
+  transition: transform .08s ease, box-shadow .2s ease;
 }
 .halo {
   position: absolute; inset: 6%;
@@ -132,6 +146,10 @@ html, body {
 }
 .r2 { inset: 8%; animation-duration: 18s; animation-direction: reverse; opacity: .6; }
 #core:active .core-body { transform: scale(.94); }
+#core.rift .core-body {
+  box-shadow: 0 0 28px #ffd27a, 0 0 60px #ff8a3c88;
+}
+#core.rift .ring { border-color: #ffd27a88; animation-duration: 3s; }
 
 .combo {
   margin-top: 10px;
@@ -150,6 +168,7 @@ html, body {
   animation: rise 700ms ease-out forwards;
   text-shadow: 0 2px 8px #000;
 }
+.floater.crit { color: #ffd27a; font-size: 1.1em; }
 
 .dock {
   position: fixed;
