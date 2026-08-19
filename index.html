@@ -4,28 +4,28 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#070b16" />
-  <title>Сердце Туманности</title>
+  <title>Nebula Heart</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <div id="boot">
     <div class="boot-mark" aria-hidden="true"></div>
-    <h1>Сердце Туманности</h1>
-    <p>Настройка ядра…</p>
+    <h1 data-i18n="title">Сердце Туманности</h1>
+    <p data-i18n="boot">Настройка ядра…</p>
     <div class="boot-bar"><i id="bootFill"></i></div>
   </div>
 
   <div id="app" class="hidden">
     <header class="top">
       <div class="stat">
-        <span class="label">Звёздная пыль</span>
+        <span class="label" data-i18n="dust">Звёздная пыль</span>
         <strong id="dust">0</strong>
       </div>
       <div class="stat">
-        <span class="label">Поток</span>
+        <span class="label" data-i18n="flow">Поток</span>
         <strong id="rate">0 / сек</strong>
       </div>
-      <button id="btnMenu" class="icon-btn" type="button" aria-label="Меню">☰</button>
+      <button id="btnMenu" class="icon-btn" type="button" data-i18n-aria="menu" aria-label="Меню">☰</button>
     </header>
 
     <section class="stage">
@@ -37,7 +37,7 @@
         </div>
       </div>
 
-      <button id="core" type="button" aria-label="Настроить ядро">
+      <button id="core" type="button" data-i18n-aria="tuneCore" aria-label="Настроить ядро">
         <span class="halo"></span>
         <span class="core-body" id="coreBody"></span>
         <span class="ring r1"></span>
@@ -48,9 +48,9 @@
     </section>
 
     <nav class="dock">
-      <button id="btnShop" type="button">Орбиты</button>
-      <button id="btnCollapse" type="button">Коллапс</button>
-      <button id="btnReward" type="button">Квант пыли</button>
+      <button id="btnShop" type="button" data-i18n="orbits">Орбиты</button>
+      <button id="btnCollapse" type="button" data-i18n="collapse">Коллапс</button>
+      <button id="btnReward" type="button" data-i18n="reward">Квант пыли</button>
     </nav>
   </div>
 
@@ -58,7 +58,7 @@
     <div class="sheet-card">
       <div class="sheet-head">
         <h2 id="sheetTitle">Орбиты</h2>
-        <button id="sheetClose" type="button">Закрыть</button>
+        <button id="sheetClose" type="button" data-i18n="close">Закрыть</button>
       </div>
       <div id="sheetBody" class="sheet-body"></div>
     </div>
@@ -71,6 +71,7 @@
     window.GP_PROJECT_ID = 'YOUR_PROJECT_ID';
     window.GP_PUBLIC_TOKEN = 'YOUR_PUBLIC_TOKEN';
   </script>
+  <script src="js/i18n.js"></script>
   <script src="js/gp-bridge.js"></script>
   <script src="js/game.js"></script>
   <script>
