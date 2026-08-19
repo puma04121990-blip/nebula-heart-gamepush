@@ -1,7 +1,6 @@
 /*
-  Обёртка GamePush.
-  Все вызовы безопасны: без токена или на неподдерживаемой площадке игра живёт на localStorage.
-  Поля и реклама настраиваются в панели — см. README.
+  GamePush wrapper.
+  Safe without a token: the game falls back to localStorage.
 */
 (function (w) {
   var gp = null;
@@ -36,7 +35,6 @@
     }
   };
 
-  /* Если SDK не подключён — не ждём вечно */
   setTimeout(function () {
     if (!ready) markReady(null);
   }, 3500);
@@ -53,6 +51,16 @@
     whenReady: whenReady,
     has: function () { return !!gp; },
     raw: function () { return gp; },
+
+    platformLang: function () {
+      if (gp && gp.language) return String(gp.language).slice(0, 2).toLowerCase();
+      return '';
+    },
+
+    setLanguage: function (code) {
+      if (!gp || typeof gp.changeLanguage !== 'function') return;
+      try { gp.changeLanguage(code); } catch (e) {}
+    },
 
     loadProgress: function () {
       if (gp) {
@@ -114,12 +122,12 @@
       } catch (e) { return false; }
     },
 
-    invite: function () {
+    invite: function (text) {
       if (!gp || !gp.socials) return false;
       try {
         if (typeof gp.socials.invite === 'function') { gp.socials.invite(); return true; }
         if (typeof gp.socials.share === 'function') {
-          gp.socials.share({ text: 'Собираю звёздную пыль в «Сердце Туманности»' });
+          gp.socials.share({ text: text || '' });
           return true;
         }
       } catch (e) {}
