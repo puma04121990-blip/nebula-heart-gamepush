@@ -2,39 +2,50 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#070b16" />
-  <title>Nebula Heart</title>
+  <meta name="description" content="Сердце Туманности — космическая idle-игра с коллапсами, экспедициями и исследованиями." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Сердце Туманности</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <div id="boot">
+  <div id="boot" aria-live="polite">
     <div class="boot-mark" aria-hidden="true"></div>
     <h1 data-i18n="title">Сердце Туманности</h1>
     <p data-i18n="boot">Настройка ядра…</p>
-    <div class="boot-bar"><i id="bootFill"></i></div>
+    <div class="boot-bar" aria-hidden="true"><i id="bootFill"></i></div>
   </div>
 
-  <div id="app" class="hidden">
+  <main id="app" class="hidden" aria-label="Сердце Туманности">
     <header class="top">
-      <div class="stat">
+      <div class="stat stat-dust">
         <span class="label" data-i18n="dust">Звёздная пыль</span>
-        <strong id="dust">0</strong>
+        <strong id="dust" aria-live="polite">0</strong>
       </div>
-      <div class="stat">
+      <div class="stat stat-flow">
         <span class="label" data-i18n="flow">Поток</span>
         <strong id="rate">0 / сек</strong>
       </div>
-      <button id="btnMenu" class="icon-btn" type="button" data-i18n-aria="menu" aria-label="Меню">☰</button>
+      <button id="btnMenu" class="icon-btn" type="button" data-i18n-aria="menu" aria-label="Меню" aria-haspopup="dialog">☰</button>
     </header>
 
-    <section class="stage">
+    <section class="stage" aria-label="Игровое ядро">
+      <button id="btnObjectives" class="activity-card" type="button" aria-haspopup="dialog" data-i18n-aria="objectivesOpen">
+        <span class="activity-kicker" id="activityKicker">Созвездие</span>
+        <strong id="activityTitle">Стабилизация сигнала</strong>
+        <span id="activityMeta">0 / 3</span>
+        <i class="activity-progress"><b id="activityFill"></b></i>
+      </button>
+
       <div class="stage-meta">
         <div id="formName">Искра пустоты</div>
         <div id="tideChip" class="chip">Штиль</div>
         <div class="evo-row">
           <span id="evoLabel">Фаза 0%</span>
-          <div class="evo-bar"><i id="evoFill"></i></div>
+          <div class="evo-bar" aria-hidden="true"><i id="evoFill"></i></div>
         </div>
       </div>
 
@@ -43,20 +54,22 @@
         <span class="core-body" id="coreBody"></span>
         <span class="ring r1"></span>
         <span class="ring r2"></span>
+        <span class="core-sigil" aria-hidden="true"></span>
       </button>
-      <div id="combo" class="combo hidden">резонанс ×1</div>
-      <div id="floatLayer" class="floats"></div>
+      <div id="combo" class="combo hidden" aria-live="polite">резонанс ×1</div>
+      <p id="stageHint" class="stage-hint" data-i18n="stageHint">Касайтесь ядра в одном ритме для резонанса</p>
+      <div id="floatLayer" class="floats" aria-hidden="true"></div>
     </section>
 
-    <nav class="dock">
-      <button id="btnShop" type="button" data-i18n="orbits">Орбиты</button>
-      <button id="btnCollapse" type="button" data-i18n="collapse">Коллапс</button>
+    <nav class="dock" aria-label="Основные действия">
+      <button id="btnShop" type="button" data-i18n="orbits" aria-haspopup="dialog">Орбиты</button>
+      <button id="btnCollapse" type="button" data-i18n="collapse" aria-haspopup="dialog">Коллапс</button>
       <button id="btnReward" type="button" data-i18n="reward">Квант пыли</button>
     </nav>
-  </div>
+  </main>
 
-  <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true">
-    <div class="sheet-card">
+  <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" aria-hidden="true">
+    <div class="sheet-card" tabindex="-1">
       <div class="sheet-head">
         <h2 id="sheetTitle">Орбиты</h2>
         <button id="sheetClose" type="button" data-i18n="close">Закрыть</button>
@@ -65,7 +78,7 @@
     </div>
   </div>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <script>
     window.GP_PROJECT_ID = 'YOUR_PROJECT_ID';
@@ -73,6 +86,7 @@
   </script>
   <script src="js/i18n.js"></script>
   <script src="js/gp-bridge.js"></script>
+  <script src="js/audio-engine.js"></script>
   <script src="js/game.js"></script>
   <script>
     (function loadGP() {
