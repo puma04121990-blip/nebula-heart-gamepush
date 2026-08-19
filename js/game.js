@@ -107,6 +107,7 @@
   var rewardBusy = false;
   var previousFocus = null;
   var demoMode = /(?:[?&])demo(?:=1)?(?:&|$)/.test(window.location.search);
+  var demoSettingsMode = demoMode && /(?:[?&])settings=1(?:&|$)/.test(window.location.search);
 
   var el = {
     boot: document.getElementById('boot'),
@@ -147,13 +148,18 @@
     });
     return value;
   }
-  function detectLang() {
+  function savedLang() {
     try {
       var saved = localStorage.getItem(LANG_KEY);
-      if (saved === 'ru' || saved === 'en') return saved;
-    } catch (e) {}
+      return saved === 'ru' || saved === 'en' ? saved : '';
+    } catch (e) { return ''; }
+  }
+  function validLang(code) { return code === 'ru' || code === 'en'; }
+  function detectLang() {
+    var saved = savedLang();
+    if (saved) return saved;
     var platform = typeof GPX !== 'undefined' ? GPX.platformLang() : '';
-    if (platform === 'ru' || platform === 'en') return platform;
+    if (validLang(platform)) return platform;
     return (navigator.language || 'ru').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'ru';
   }
   function applyStaticI18n() {
@@ -163,13 +169,20 @@
     document.querySelectorAll('[data-i18n-aria]').forEach(function (node) { node.setAttribute('aria-label', t(node.getAttribute('data-i18n-aria'))); });
   }
   function setLang(code) {
-    state.lang = code === 'en' ? 'en' : 'ru';
+    var next = validLang(code) ? code : 'ru';
+    if (state.lang === next) return;
+    state.lang = next;
     try { localStorage.setItem(LANG_KEY, state.lang); } catch (e) {}
     if (typeof GPX !== 'undefined') GPX.setLanguage(state.lang);
     applyStaticI18n();
     persist();
     renderHud(true);
     refreshOpenSheet();
+    toast(t('languageChanged', { name: t(next === 'ru' ? 'langRu' : 'langEn') }));
+    requestAnimationFrame(function () {
+      var active = el.sheetBody.querySelector('[data-lang="' + next + '"]');
+      if (active) active.focus();
+    });
   }
   function fmt(value) {
     if (!isFinite(value)) return '0';
@@ -618,16 +631,27 @@
       '<button class="menu-item" data-act="privacy">' + t('privacy') + '</button>' +
       '<button class="menu-item danger" data-act="reset">' + t('reset') + '</button>';
   }
-  function settingRow(label, value, action) {
-    return '<div class="set-row"><div><strong>' + label + '</strong><span>' + (value ? t('on') : t('off')) + '</span></div><button class="menu-item" data-act="' + action + '">' + (value ? t('on') : t('off')) + '</button></div>';
+  function settingRow(label, description, value, action) {
+    var stateLabel = value ? t('on') : t('off');
+    return '<div class="set-row"><div class="setting-copy"><strong>' + label + '</strong><span>' + description + '</span></div>' +
+      '<button type="button" class="setting-switch ' + (value ? 'is-on' : 'is-off') + '" data-act="' + action + '" role="switch" aria-checked="' + value + '" aria-label="' + label + ': ' + stateLabel + '">' +
+      '<span class="switch-state">' + stateLabel + '</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span></button></div>';
+  }
+  function languageOption(code, short, name) {
+    var active = state.lang === code;
+    return '<button type="button" class="language-option ' + (active ? 'is-active' : '') + '" data-lang="' + code + '" aria-pressed="' + active + '" aria-label="' + t('languageSelect', { name: name }) + '">' +
+      '<span class="language-code">' + short + '</span><span class="language-name">' + name + '</span><span class="language-check" aria-hidden="true">✓</span></button>';
   }
   function settingsHtml() {
-    return settingRow(t('music'), state.settings.music, 'toggle-music') +
-      settingRow(t('effects'), state.settings.effects, 'toggle-effects') +
-      settingRow(t('haptics'), state.settings.haptics, 'toggle-haptics') +
-      settingRow(t('motion'), state.settings.motion, 'toggle-motion') +
-      '<div class="set-row"><div><strong>' + t('language') + '</strong></div><div class="lang-switch"><button data-lang="ru" class="' + (state.lang === 'ru' ? 'on' : '') + '">' + t('langRu') + '</button><button data-lang="en" class="' + (state.lang === 'en' ? 'on' : '') + '">' + t('langEn') + '</button></div></div>' +
-      '<button class="menu-item" data-act="menu">' + t('back') + '</button>';
+    return '<div class="settings-intro"><span>' + t('settingsKicker') + '</span><p>' + t('settingsLead') + '</p></div>' +
+      '<section class="language-row" aria-labelledby="languageTitle"><div class="language-heading"><span>' + t('languageKicker') + '</span><strong id="languageTitle">' + t('language') + '</strong><p>' + t('languageLead') + '</p></div>' +
+      '<div class="lang-switch" role="group" aria-label="' + t('language') + '">' + languageOption('ru', 'RU', t('langRu')) + languageOption('en', 'EN', t('langEn')) + '</div></section>' +
+      '<div class="settings-section-label">' + t('audioAndComfort') + '</div>' +
+      settingRow(t('music'), t('musicLead'), state.settings.music, 'toggle-music') +
+      settingRow(t('effects'), t('effectsLead'), state.settings.effects, 'toggle-effects') +
+      settingRow(t('haptics'), t('hapticsLead'), state.settings.haptics, 'toggle-haptics') +
+      settingRow(t('motion'), t('motionLead'), state.settings.motion, 'toggle-motion') +
+      '<button class="menu-item settings-back" data-act="menu">' + t('back') + '</button>';
   }
   function aboutHtml() {
     return '<div class="about-card"><p class="note"><strong>' + t('title') + '</strong> — ' + t('about1') + '</p><p class="note">' + t('about2') + '</p><p class="note">' + t('about3') + '</p></div><button class="menu-item" data-act="menu">' + t('back') + '</button>';
@@ -870,11 +894,12 @@
   scheduleRift(Date.now());
   bootAnim(function () {
     GPX.whenReady(function () {
-      if (!localStorage.getItem(LANG_KEY)) {
-        var platformLang = GPX.platformLang();
-        if (platformLang === 'ru' || platformLang === 'en') state.lang = platformLang;
-      }
+      var explicitLang = savedLang();
+      var platformLang = GPX.platformLang();
       var offline = hydrate(demoMode ? demoState() : GPX.loadProgress());
+      if (explicitLang) state.lang = explicitLang;
+      else if (validLang(platformLang)) state.lang = platformLang;
+      else if (!validLang(state.lang)) state.lang = detectLang();
       ensureDaily();
       applyStaticI18n();
       document.body.classList.toggle('motion-off', !state.settings.motion);
@@ -882,6 +907,7 @@
       el.boot.classList.add('hidden');
       el.app.classList.remove('hidden');
       renderHud(true);
+      if (demoSettingsMode) openSheet('settings', t('settings'), settingsHtml());
       if (offline > 1) toast(t('offline', { n: fmt(offline) }));
       persist();
       lastTick = Date.now();
