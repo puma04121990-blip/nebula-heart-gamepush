@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#070b16" />
+  <title>Сердце Туманности</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="boot">
+    <div class="boot-mark" aria-hidden="true"></div>
+    <h1>Сердце Туманности</h1>
+    <p>Настройка ядра…</p>
+    <div class="boot-bar"><i id="bootFill"></i></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <header class="top">
+      <div class="stat">
+        <span class="label">Звёздная пыль</span>
+        <strong id="dust">0</strong>
+      </div>
+      <div class="stat">
+        <span class="label">Поток</span>
+        <strong id="rate">0 / сек</strong>
+      </div>
+      <button id="btnMenu" class="icon-btn" type="button" aria-label="Меню">☰</button>
+    </header>
+
+    <section class="stage">
+      <div class="stage-meta">
+        <div id="formName">Искра пустоты</div>
+        <div class="evo-row">
+          <span id="evoLabel">Фаза 0%</span>
+          <div class="evo-bar"><i id="evoFill"></i></div>
+        </div>
+      </div>
+
+      <button id="core" type="button" aria-label="Настроить ядро">
+        <span class="halo"></span>
+        <span class="core-body" id="coreBody"></span>
+        <span class="ring r1"></span>
+        <span class="ring r2"></span>
+      </button>
+      <div id="combo" class="combo hidden">резонанс ×1</div>
+      <div id="floatLayer" class="floats"></div>
+    </section>
+
+    <nav class="dock">
+      <button id="btnShop" type="button">Орбиты</button>
+      <button id="btnCollapse" type="button">Коллапс</button>
+      <button id="btnReward" type="button">Квант пыли</button>
+    </nav>
+  </div>
+
+  <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true">
+    <div class="sheet-card">
+      <div class="sheet-head">
+        <h2 id="sheetTitle">Орбиты</h2>
+        <button id="sheetClose" type="button">Закрыть</button>
+      </div>
+      <div id="sheetBody" class="sheet-body"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script>
+    /* Замените на значения из панели GamePush */
+    window.GP_PROJECT_ID = 'YOUR_PROJECT_ID';
+    window.GP_PUBLIC_TOKEN = 'YOUR_PUBLIC_TOKEN';
+  </script>
+  <script src="js/gp-bridge.js"></script>
+  <script src="js/game.js"></script>
+  <script>
+    (function loadGP() {
+      var id = window.GP_PROJECT_ID;
+      var token = window.GP_PUBLIC_TOKEN;
+      if (!id || id === 'YOUR_PROJECT_ID') return;
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://gamepush.com/sdk/game-score.js?projectId=' +
+        encodeURIComponent(id) + '&publicToken=' + encodeURIComponent(token) +
+        '&callback=onGPInit';
+      document.body.appendChild(s);
+    })();
+  </script>
+</body>
+</html>
