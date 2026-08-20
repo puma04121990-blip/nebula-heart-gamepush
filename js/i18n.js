@@ -60,7 +60,6 @@ window.I18N = {
     ready: 'Готово',
     active: 'В пути',
     comingSoon: 'Скоро',
-
     contracts: 'Созвездие дня',
     contractsLead: 'Три спокойные цели на сегодня. Выполните все, чтобы получить звёздный ключ для исследований.',
     contractsDone: 'Созвездие собрано: ключ +{n}',
@@ -73,7 +72,6 @@ window.I18N = {
     missionDustD: 'Соберите {need} пыли за день',
     missionClaim: 'Собрать созвездие',
     keys: 'Звёздные ключи',
-
     expeditions: 'Экспедиции',
     expeditionsLead: 'Отправляйте одну автономную экспедицию. Выбор определяет награду и создаёт повод вернуться.',
     expeditionActive: 'Экспедиция завершится через {time}',
@@ -91,12 +89,10 @@ window.I18N = {
     expRewardKey: '+{n} ключ',
     expRewardFocus: '+1 фокус',
     expeditionReturned: 'Экспедиция «{name}» принесла {reward}',
-
     researchLead: 'Ключи из созвездий открывают постоянные знания. Они сохраняются после коллапса.',
     researchNeed: 'Нужен ключ',
     researchNames: ['Орбитальная память', 'Карта аномалий', 'Эхо сингулярности', 'Спектральный резонатор', 'Протокол сна', 'Хроника коллапсов'],
     researchDesc: ['+4% к потоку за уровень', 'Разломы появляются быстрее', '+8% к силе настройки за уровень', 'Длиннее окно резонанса', '+1 час оффлайн-потолка', '+5% к наградам коллапса'],
-
     collapseNote: 'Сжать ядро в сингулярность. Текущая пыль, орбиты, гармонии и сигналы обнулятся. Гравитация, осколки, ключи и исследования останутся.',
     gravityNow: 'Текущая гравитация',
     gravityAfter: 'После коллапса',
@@ -118,11 +114,14 @@ window.I18N = {
     remSpanD: '+2 часа к оффлайн-потолку за уровень',
     remSight: 'Острое зрение',
     remSightD: '+25% к добыче разлома за уровень',
-
     about1: '«Сердце Туманности» — космическая idle-игра о живом ядре: настраивайте его, раскручивайте орбиты, ловите разломы и запускайте коллапс.',
     about2: 'Созвездия дня, экспедиции и исследования добавляют короткие, средние и долгие цели без перегрузки основного экрана.',
-    about3: 'Прогресс сохраняется локально и в облаке GamePush, если SDK подключён. Версия 2.0.',
+    about3: 'Прогресс сохраняется локально и в облаке GamePush, если SDK подключён. Версия 2.1.',
     collapsed: 'Коллапс состоялся. Гравитация ×{n} · осколки +{r}',
+    ceremonyKicker: 'Коллапс ядра',
+    ceremonyTitle: 'Туманность сжалась',
+    ceremonyText: 'Гравитация теперь ×{n}. Осколки +{r}. Следующий цикл начнётся сильнее.',
+    ceremonyOk: 'Слушать тишину',
     resetAsk: 'Обнулить всё, включая гравитацию, осколки, ключи и исследования?',
     rewardOk: 'Квант принёс +{n} пыли',
     rewardFail: 'Ролик недоступен',
@@ -219,7 +218,6 @@ window.I18N = {
     ready: 'Ready',
     active: 'En route',
     comingSoon: 'Soon',
-
     contracts: 'Daily constellation',
     contractsLead: 'Three calm goals for today. Complete them all to earn a stellar key for research.',
     contractsDone: 'Constellation collected: key +{n}',
@@ -232,7 +230,6 @@ window.I18N = {
     missionDustD: 'Gather {need} dust today',
     missionClaim: 'Collect constellation',
     keys: 'Stellar keys',
-
     expeditions: 'Expeditions',
     expeditionsLead: 'Send one autonomous expedition. Its route determines the reward and gives you a reason to return.',
     expeditionActive: 'Expedition completes in {time}',
@@ -250,12 +247,10 @@ window.I18N = {
     expRewardKey: '+{n} key',
     expRewardFocus: '+1 focus',
     expeditionReturned: 'The “{name}” expedition brought {reward}',
-
     researchLead: 'Keys from constellations unlock permanent knowledge. It survives collapse.',
     researchNeed: 'Needs a key',
     researchNames: ['Orbital memory', 'Anomaly map', 'Singularity echo', 'Spectral resonator', 'Sleep protocol', 'Collapse chronicle'],
     researchDesc: ['+4% flow per level', 'Rifts appear more often', '+8% tuning power per level', 'Longer resonance window', '+1 hour offline cap', '+5% collapse rewards'],
-
     collapseNote: 'Crush the core into a singularity. Current dust, orbits, harmonies and signals reset. Gravity, remnants, keys and research remain.',
     gravityNow: 'Current gravity',
     gravityAfter: 'After collapse',
@@ -277,11 +272,14 @@ window.I18N = {
     remSpanD: '+2 hours offline cap per level',
     remSight: 'Sharp sight',
     remSightD: '+25% rift bounty per level',
-
     about1: 'Nebula Heart is a cosmic idle game about a living core: tune it, spin orbits, catch rifts and trigger collapse.',
     about2: 'Daily constellations, expeditions and research provide short, medium and long goals without crowding the main screen.',
-    about3: 'Progress is saved locally and in the GamePush cloud when the SDK is connected. Version 2.0.',
+    about3: 'Progress is saved locally and in the GamePush cloud when the SDK is connected. Version 2.1.',
     collapsed: 'Collapse complete. Gravity ×{n} · remnants +{r}',
+    ceremonyKicker: 'Core collapse',
+    ceremonyTitle: 'The nebula folded',
+    ceremonyText: 'Gravity is now ×{n}. Remnants +{r}. The next cycle starts stronger.',
+    ceremonyOk: 'Listen to the quiet',
     resetAsk: 'Reset everything, including gravity, remnants, keys and research?',
     rewardOk: 'Quantum brought +{n} dust',
     rewardFail: 'Rewarded ad is unavailable',
