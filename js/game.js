@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var SAVE_VERSION = 3;
+  var SAVE_VERSION = 4;
   var LANG_KEY = 'nebula-heart-lang';
   var TYPES = ['pulse', 'whisper', 'beacon', 'mirror', 'ash', 'comet'];
   var POSITIONS = [[20,68],[25,26],[48,17],[75,27],[80,67],[49,79],[61,45]];
@@ -30,6 +30,13 @@
     { id: 'horizon', symbol: '⌒', title: 'lensHorizon', desc: 'lensHorizonD', cost: 3 },
     { id: 'hush', symbol: '∵', title: 'lensHush', desc: 'lensHushD', cost: 4 }
   ];
+  var MOTIFS = {
+    first: { id: 'first', glyph: '⟡', name: 'motifFirst', hint: 'motifFirstHint', mark: 'markFirst' },
+    warm: { id: 'warm', glyph: '☉', name: 'motifWarm', hint: 'motifWarmHint', mark: 'markWarm' },
+    loop: { id: 'loop', glyph: '◌', name: 'motifLoop', hint: 'motifLoopHint', mark: 'markLoop' },
+    mirror: { id: 'mirror', glyph: '⌘', name: 'motifMirror', hint: 'motifMirrorHint', mark: 'markMirror' },
+    comet: { id: 'comet', glyph: '✦', name: 'motifComet', hint: 'motifCometHint', mark: 'markComet' }
+  };
 
   var state;
   var mode = 'field-ready';
@@ -45,7 +52,7 @@
   var el = {
     boot: document.getElementById('boot'), fill: document.getElementById('bootFill'), app: document.getElementById('app'),
     chapterName: document.getElementById('chapterName'), fieldDay: document.getElementById('fieldDay'), fieldCount: document.getElementById('fieldCount'),
-    briefEyebrow: document.getElementById('briefEyebrow'), briefTitle: document.getElementById('briefTitle'), briefMeta: document.getElementById('briefMeta'), briefFill: document.getElementById('briefFill'),
+    briefEyebrow: document.getElementById('briefEyebrow'), briefTitle: document.getElementById('briefTitle'), briefMeta: document.getElementById('briefMeta'), briefLetter: document.getElementById('briefLetter'), briefFill: document.getElementById('briefFill'),
     sky: document.getElementById('sky'), signalLayer: document.getElementById('signalLayer'), threadSvg: document.getElementById('threadSvg'), anomaly: document.getElementById('anomalyNode'), fieldPrompt: document.getElementById('fieldPrompt'),
     listen: document.getElementById('actListen'), connect: document.getElementById('actConnect'), witness: document.getElementById('actWitness'),
     menu: document.getElementById('btnMenu'), chapter: document.getElementById('btnChapter'), brief: document.getElementById('btnBrief'), atlas: document.getElementById('btnAtlas'), lenses: document.getElementById('btnLenses'), encounters: document.getElementById('btnEncounters'),
@@ -84,6 +91,33 @@
   function anomalyById(id) { return ANOMALIES.filter(function (item) { return item.id === id; })[0] || ANOMALIES[0]; }
   function chooseAnomaly(seed, chapter) { return ANOMALIES[Math.abs(int(seed) + int(chapter) * 7) % ANOMALIES.length]; }
   function activeAnomaly() { return anomalyById(activeField().anomaly && activeField().anomaly.id); }
+  function motifById(id) { return MOTIFS[id] || MOTIFS.first; }
+  function hasSignalType(signals, type) { return signals.some(function (signal) { return signal.type === type; }); }
+  function availableMotifs(signals) {
+    var list = ['first', 'loop'];
+    if (hasSignalType(signals, 'ash') && hasSignalType(signals, 'beacon')) list.push('warm');
+    if (hasSignalType(signals, 'mirror')) list.push('mirror');
+    if (hasSignalType(signals, 'comet')) list.push('comet');
+    return list;
+  }
+  function motifIdFor(seed, signals, requested) {
+    var list = availableMotifs(signals);
+    if (requested && list.indexOf(requested) >= 0) return requested;
+    return list[Math.abs(int(seed) + list.length * 13) % list.length];
+  }
+  function activeMotif(field) { field = field || activeField(); return motifById(field.motif); }
+  function linksInclude(field, first, second) {
+    return field.links.some(function (link) { var a = findSignal(link.a), b = findSignal(link.b); return a && b && ((a.type === first && b.type === second) || (a.type === second && b.type === first)); });
+  }
+  function motifAchieved(field) {
+    var motif = activeMotif(field);
+    if (motif.id === 'first') return field.links.length >= 1;
+    if (motif.id === 'warm') return linksInclude(field, 'ash', 'beacon');
+    if (motif.id === 'loop') return familyOf(field) === 'loop';
+    if (motif.id === 'mirror') return field.links.filter(function (link) { var a = findSignal(link.a), b = findSignal(link.b); return (a && a.type === 'mirror') || (b && b.type === 'mirror'); }).length >= 2;
+    if (motif.id === 'comet') return field.links.some(function (link) { var a = findSignal(link.a), b = findSignal(link.b); return (a && a.type === 'comet') || (b && b.type === 'comet'); });
+    return false;
+  }
 
   function freshState(language, settings) {
     var seed = hash('first:' + dayIndex());
@@ -93,7 +127,7 @@
       currentField: null, atlas: [], anomalyMemory: {}, encounters: [],
       stats: { observations: 0, links: 0, constellations: 0, shared: 0, imported: 0, witnessed: 0 }, lastFieldAt: now(), welcome: false
     };
-    fresh.currentField = createField(seed, 0, false);
+    fresh.currentField = createField(seed, 0, false, '', 'first');
     return fresh;
   }
 
@@ -108,12 +142,13 @@
     var links = Array.isArray(raw.links) ? raw.links.filter(function (link) { return link && ids[link.a] && ids[link.b] && link.a !== link.b; }).slice(0, 12).map(function (link) { return { a: String(link.a), b: String(link.b) }; }) : [];
     var listened = Array.isArray(raw.listened) ? raw.listened.filter(function (id) { return ids[id]; }).slice(0, signals.length) : [];
     var storedAnomaly = anomalyById(raw.anomaly && raw.anomaly.id);
-    return { id: String(raw.id || ('field-' + now())), seed: int(raw.seed, hash(now())), chapter: int(raw.chapter, chapter), signals: signals, links: links, listened: listened, anomaly: { id: storedAnomaly.id, needed: Math.max(2, int(raw.anomaly && raw.anomaly.needed, storedAnomaly.minLinks)) }, mirrorEcho: !!raw.mirrorEcho, status: raw.status === 'resolved' ? 'resolved' : 'ready', imported: !!raw.imported, createdAt: n(raw.createdAt, now()) };
+    var seed = int(raw.seed, hash(now()));
+    return { id: String(raw.id || ('field-' + now())), seed: seed, chapter: int(raw.chapter, chapter), signals: signals, links: links, listened: listened, anomaly: { id: storedAnomaly.id, needed: Math.max(2, int(raw.anomaly && raw.anomaly.needed, storedAnomaly.minLinks)) }, motif: motifIdFor(seed, signals, raw.motif), mirrorEcho: !!raw.mirrorEcho, status: raw.status === 'resolved' ? 'resolved' : 'ready', imported: !!raw.imported, challengeFamily: typeof raw.challengeFamily === 'string' ? raw.challengeFamily : '', createdAt: n(raw.createdAt, now()) };
   }
 
   function migrate(data) {
     if (!data || typeof data !== 'object') return freshState(detectLanguage());
-    if (int(data.version) >= SAVE_VERSION && data.currentField) {
+    if (int(data.version) >= 3 && data.currentField) {
       var stateV3 = freshState(data.lang === 'en' || data.lang === 'ru' ? data.lang : detectLanguage(), data.settings);
       stateV3.legacyDust = n(data.legacyDust);
       stateV3.chapter = Math.min(CHAPTERS.length - 1, int(data.chapter));
@@ -138,11 +173,11 @@
     return migrated;
   }
 
-  function createField(seed, chapter, imported, forcedAnomalyId) {
+  function createField(seed, chapter, imported, forcedAnomalyId, forcedMotifId) {
     var rnd = seeded(seed); var ch = chapterAt(chapter); var anomaly = forcedAnomalyId ? anomalyById(forcedAnomalyId) : chooseAnomaly(seed, chapter); var count = 5 + ((state && state.lenses.horizon && rnd() > .42) ? 1 : 0);
     var types = shuffle(ch.pool, rnd); var positions = shuffle(POSITIONS, rnd); var signals = [];
     for (var i = 0; i < count; i++) signals.push({ id: 's' + i, type: types[i % types.length], x: positions[i][0] + Math.round((rnd() - .5) * 4), y: positions[i][1] + Math.round((rnd() - .5) * 4) });
-    return { id: 'field-' + seed + '-' + now(), seed: seed, chapter: chapter, signals: signals, links: [], listened: [], anomaly: { id: anomaly.id, needed: Math.max(2, anomaly.minLinks - (state && state.lenses.hush ? 1 : 0)) }, mirrorEcho: false, status: 'ready', imported: !!imported, createdAt: now() };
+    return { id: 'field-' + seed + '-' + now(), seed: seed, chapter: chapter, signals: signals, links: [], listened: [], anomaly: { id: anomaly.id, needed: Math.max(2, anomaly.minLinks - (state && state.lenses.hush ? 1 : 0)) }, motif: motifIdFor(seed, signals, forcedMotifId), mirrorEcho: false, status: 'ready', imported: !!imported, challengeFamily: '', createdAt: now() };
   }
 
   function activeField() { return state.currentField; }
@@ -195,6 +230,9 @@
     if (field.links.length >= field.anomaly.needed) { el.briefTitle.textContent = t(activeAnomaly().title); el.briefMeta.textContent = t('anomalyReady'); }
     else if (!field.listened.length) { el.briefTitle.textContent = t('listenSky'); el.briefMeta.textContent = t('chooseSignal'); }
     else { el.briefTitle.textContent = t('connect'); el.briefMeta.textContent = t('linksCount', { count: field.links.length }); }
+    var motif = activeMotif(field), achieved = motifAchieved(field);
+    el.briefLetter.textContent = motif.glyph + ' ' + t(achieved ? 'motifComplete' : 'nightLetter', { name: t(motif.name) });
+    el.briefLetter.classList.toggle('is-complete', achieved);
     el.briefFill.style.width = progress + '%';
   }
 
@@ -206,6 +244,8 @@
     });
     if (field.mirrorEcho && field.links.length) { var last = field.links[field.links.length - 1], ma = findSignal(last.a), mb = findSignal(last.b); if (ma && mb) pathData += '<circle class="mirror-glint" cx="' + ((ma.x + mb.x) / 2) + '" cy="' + ((ma.y + mb.y) / 2) + '" r="1.7"></circle>'; }
     el.threadSvg.innerHTML = pathData;
+    el.sky.classList.toggle('motif-awake', motifAchieved(field));
+    el.sky.setAttribute('data-motif', activeMotif(field).id);
   }
   function promptForField() {
     var field = activeField(); var selected = findSignal(selectedId);
@@ -228,7 +268,9 @@
       return '<button type="button" class="' + classes.join(' ') + '" data-signal="' + signal.id + '" style="left:' + signal.x + '%;top:' + signal.y + '%" aria-label="' + name + (isListened(signal.id) ? ': ' + trait : '') + '"><span class="signal-orb" aria-hidden="true"></span><span class="signal-label">' + name + '<small>' + trait + '</small></span></button>';
     }).join('');
     renderThreads(); el.anomaly.classList.toggle('hidden', field.links.length < field.anomaly.needed);
-    el.fieldPrompt.textContent = promptForField();
+    var motif = activeMotif(field), achieved = motifAchieved(field);
+    el.fieldPrompt.textContent = achieved ? motif.glyph + ' ' + t('motifAwake', { name: t(motif.name) }) : motif.glyph + ' ' + t(motif.hint);
+    el.fieldPrompt.classList.toggle('is-motif-awake', achieved);
     var noSelection = !selectedId || !isListened(selectedId);
     el.listen.disabled = paused || !selectedId || isListened(selectedId) || field.status === 'resolved';
     el.connect.disabled = paused || field.status === 'resolved' || (mode !== 'link-source' && (field.listened.length < 2));
@@ -271,12 +313,14 @@
   }
   function openAnomaly() { if (activeField().links.length < activeField().anomaly.needed) { toast(t('needMoreLinks', { count: activeField().anomaly.needed - activeField().links.length })); return; } openSheet('anomaly'); }
   function resolveAnomaly(decision) {
-    var field = activeField(), family = familyOf(field), anomaly = activeAnomaly(); var card = {
-      id: 'card-' + now() + '-' + Math.round(Math.random() * 999), seed: field.seed, chapter: field.chapter, signals: field.signals.map(function (s) { return s.type; }), links: field.links.slice(), family: family, anomaly: anomaly.id, decision: decision, title: familyKey(family), timestamp: now(), imported: field.imported
+    var field = activeField(), family = familyOf(field), anomaly = activeAnomaly(), motif = activeMotif(field), marked = motifAchieved(field), duet = '';
+    if (field.imported && field.challengeFamily) duet = family === field.challengeFamily ? 'harmony' : 'counterpoint';
+    var card = {
+      id: 'card-' + now() + '-' + Math.round(Math.random() * 999), seed: field.seed, chapter: field.chapter, signals: field.signals.map(function (s) { return s.type; }), links: field.links.slice(), family: family, anomaly: anomaly.id, decision: decision, title: familyKey(family), motif: motif.id, marked: marked, duet: duet, timestamp: now(), imported: field.imported
     };
     field.status = 'resolved'; state.atlas.unshift(card); state.atlas = state.atlas.slice(0, 48); state.insight++; state.stats.observations++; state.stats.constellations++; state.stats.witnessed++; state.chapterProgress.resolved++; state.chapterProgress.witnesses++;
     var memory = state.anomalyMemory[anomaly.id] || { seen: 0, preserved: 0, released: 0 }; memory.seen++; if (decision === 'preserve') memory.preserved++; else memory.released++; state.anomalyMemory[anomaly.id] = memory;
-    if (field.imported) { state.stats.imported++; state.encounters.unshift({ source: card.seed, response: card.id, timestamp: now() }); state.encounters = state.encounters.slice(0,12); }
+    if (field.imported) { state.stats.imported++; state.encounters.unshift({ source: card.seed, response: card.id, motif: motif.id, relation: duet, timestamp: now() }); state.encounters = state.encounters.slice(0,12); }
     if (state.chapter < CHAPTERS.length - 1 && state.chapterProgress.resolved >= 4) { state.chapter++; state.chapterProgress = { resolved: 0, witnesses: 0 }; toast(t('newChapter', { name: t(chapterAt(state.chapter).name) })); audio('discovery'); }
     else audio('reward'); haptic([10,28,18]); persist(); openSheet('result', card); renderAll();
   }
@@ -301,26 +345,28 @@
   }
 
   function miniLines(card) { var count = Math.min(4, card.links.length); var html = '<div class="mini-sky"></div>'; for (var i=0;i<count;i++) html += '<i class="mini-line" style="left:' + (18+i*11) + '%;top:' + (34+i*10) + '%;width:' + (34-i*3) + '%;transform:rotate(' + (-18+i*29) + 'deg)"></i>'; return html; }
+  function motifBadge(card) { var motif = motifById(card && card.motif); return '<span class="motif-badge ' + (card && card.marked ? 'is-marked' : '') + '"><i>' + motif.glyph + '</i><span>' + t(card && card.marked ? motif.mark : motif.name) + '</span></span>'; }
+  function duetNote(card) { if (!card || !card.duet) return ''; return '<p class="duet-note ' + card.duet + '"><span>' + (card.duet === 'harmony' ? '≈' : '↗') + '</span>' + t(card.duet === 'harmony' ? 'duetHarmony' : 'duetCounterpoint') + '</p>'; }
   function renderAtlasSheet() {
-    var cards = state.atlas.map(function (card) { return '<button type="button" class="atlas-card" data-card="' + card.id + '" style="--card-glow:' + (card.decision === 'preserve' ? 'rgba(117,228,239,.22)' : 'rgba(170,139,255,.22)') + '">' + miniLines(card) + '<span class="card-top"><span>' + t('recordKicker') + '</span><span>' + t(familyKey(card.family)) + '</span></span><strong>' + t(card.title) + '</strong><small>' + t('recordSignals',{count:card.signals.length,links:card.links.length}) + '</small></button>'; }).join('');
+    var cards = state.atlas.map(function (card) { return '<button type="button" class="atlas-card" data-card="' + card.id + '" style="--card-glow:' + (card.decision === 'preserve' ? 'rgba(117,228,239,.22)' : 'rgba(170,139,255,.22)') + '">' + miniLines(card) + '<span class="card-top"><span>' + t('recordKicker') + '</span><span>' + t(familyKey(card.family)) + '</span></span><strong>' + t(card.title) + '</strong>' + motifBadge(card) + '<small>' + t('recordSignals',{count:card.signals.length,links:card.links.length}) + '</small></button>'; }).join('');
     var memoryRows = ANOMALIES.filter(function (anomaly) { return state.anomalyMemory[anomaly.id]; }).map(function (anomaly) { var memory = state.anomalyMemory[anomaly.id]; return '<div class="encounter-row"><span class="lens-seal">' + anomaly.seal + '</span><div><strong>' + t(anomaly.title) + '</strong><p>' + t('witnessCount',{count:memory.seen}) + ' · ' + t(anomaly.keep) + ': ' + memory.preserved + ' · ' + t(anomaly.release) + ': ' + memory.released + '</p></div></div>'; }).join('');
     setSheet(t('atlas'), t('atlasTitle'), '<p class="sheet-intro">' + t('atlasIntro') + '</p>' + (cards ? '<div class="atlas-grid">' + cards + '</div>' : '<div class="empty">' + t('noAtlas') + '</div>') + '<span class="section-label">' + t('memory') + '</span>' + (memoryRows ? '<div class="encounter-list">' + memoryRows + '</div>' : '<div class="empty">' + t('memoryEmpty') + '</div>'));
   }
   function renderRecordSheet(card) {
     if (!card) { openSheet('atlas'); return; }
     var anomaly = anomalyById(card.anomaly); var story = t(card.decision === 'preserve' ? anomaly.keepStory : anomaly.releaseStory, { pattern: t(patternKey(card.family)) });
-    setSheet(t('recordKicker'), t(card.title), '<div class="result-seal">' + anomaly.seal + '</div><h3 class="result-title">' + t('recordOf',{name:t(card.title)}) + '</h3><p class="result-story">' + story + '</p><div class="encounter-row"><span class="lens-seal">' + anomaly.seal + '</span><div><strong>' + t(anomaly.title) + '</strong><p>' + t('recordSignals',{count:card.signals.length,links:card.links.length}) + '</p></div></div><div class="result-actions"><button type="button" class="secondary-btn" data-share-card="' + card.id + '">' + t('shareEcho') + '</button><button type="button" class="primary-btn" data-next-field="1">' + t('nextSky') + '</button></div>');
+    setSheet(t('recordKicker'), t(card.title), '<div class="result-seal">' + anomaly.seal + '</div><h3 class="result-title">' + t('recordOf',{name:t(card.title)}) + '</h3>' + motifBadge(card) + '<p class="result-story">' + story + '</p>' + duetNote(card) + '<div class="encounter-row"><span class="lens-seal">' + anomaly.seal + '</span><div><strong>' + t(anomaly.title) + '</strong><p>' + t('recordSignals',{count:card.signals.length,links:card.links.length}) + '</p></div></div><div class="result-actions"><button type="button" class="secondary-btn" data-share-card="' + card.id + '">' + t('shareEcho') + '</button><button type="button" class="primary-btn" data-next-field="1">' + t('nextSky') + '</button></div>');
   }
   function renderLensesSheet() {
     var rows = LENSES.map(function (lens) { var unlocked = !!state.lenses[lens.id]; var enough = state.insight >= lens.cost; return '<div class="lens-row"><span class="lens-seal">' + lens.symbol + '</span><div><strong>' + t(lens.title) + '</strong><p>' + t(lens.desc) + '</p></div><button type="button" data-lens="' + lens.id + '" ' + (unlocked || !enough ? 'disabled' : '') + '>' + (unlocked ? t('unlocked') : t('unlock',{count:lens.cost})) + '</button></div>'; }).join('');
     setSheet(t('lenses'), t('lensesTitle'), '<p class="sheet-intro">' + t('lensesIntro') + ' <strong>' + t('insight') + ': ' + state.insight + '</strong>.</p><div class="lens-list">' + rows + '</div>');
   }
   function renderEncountersSheet() {
-    var list = state.encounters.length ? state.encounters.map(function (encounter) { return '<div class="encounter-row"><span class="lens-seal">↗</span><div><strong>' + t('sourceEcho') + '</strong><p>' + t('yourEcho') + ' · ' + new Date(encounter.timestamp).toLocaleDateString(state.lang) + '</p></div></div>'; }).join('') : '<div class="empty">' + t('noEncounters') + '</div>';
+    var list = state.encounters.length ? state.encounters.map(function (encounter) { var motif = motifById(encounter.motif); var relation = encounter.relation === 'harmony' ? t('duetHarmony') : encounter.relation === 'counterpoint' ? t('duetCounterpoint') : t('yourEcho'); return '<div class="encounter-row"><span class="lens-seal">' + motif.glyph + '</span><div><strong>' + t('sourceEcho') + '</strong><p>' + relation + ' · ' + new Date(encounter.timestamp).toLocaleDateString(state.lang) + '</p></div></div>'; }).join('') : '<div class="empty">' + t('noEncounters') + '</div>';
     setSheet(t('encounters'), t('encountersTitle'), '<p class="sheet-intro">' + t('encountersIntro') + '</p><div class="share-code"><input id="echoCode" autocomplete="off" placeholder="AE3.…" aria-label="' + t('importCode') + '"><button type="button" class="primary-btn" data-import-echo="1">' + t('import') + '</button></div><span class="section-label">' + t('encounters') + '</span><div class="encounter-list">' + list + '</div>');
   }
   function renderAnomalySheet() { var anomaly = activeAnomaly(); setSheet(t('anomaly'), t(anomaly.title), '<p class="sheet-intro">' + t(anomaly.intro) + '</p><div class="decision-grid"><button type="button" class="decision preserve" data-decision="preserve"><span class="decision-mark">' + anomaly.seal + '</span><strong>' + t(anomaly.keep) + '</strong><p>' + t(anomaly.keepHint) + '</p></button><button type="button" class="decision release" data-decision="release"><span class="decision-mark">✧</span><strong>' + t(anomaly.release) + '</strong><p>' + t(anomaly.releaseHint) + '</p></button></div>'); }
-  function renderResultSheet(card) { var anomaly = anomalyById(card.anomaly); var story = t(card.decision === 'preserve' ? anomaly.keepStory : anomaly.releaseStory,{pattern:t(patternKey(card.family))}); setSheet(t('recordKicker'), t('recordCreated'), '<div class="result-seal">' + anomaly.seal + '</div><h3 class="result-title">' + t(card.title) + '</h3><p class="result-story">' + story + '</p><div class="result-actions"><button type="button" class="secondary-btn" data-share-card="' + card.id + '">' + t('shareEcho') + '</button><button type="button" class="primary-btn" data-next-field="1">' + t('nextSky') + '</button></div>'); }
+  function renderResultSheet(card) { var anomaly = anomalyById(card.anomaly); var story = t(card.decision === 'preserve' ? anomaly.keepStory : anomaly.releaseStory,{pattern:t(patternKey(card.family))}); var markStory = card.marked ? '<p class="mark-story">' + t('markRevealed', { name:t(motifById(card.motif).mark) }) + '</p>' : ''; setSheet(t('recordKicker'), t('recordCreated'), '<div class="result-seal">' + anomaly.seal + '</div><h3 class="result-title">' + t(card.title) + '</h3>' + motifBadge(card) + markStory + '<p class="result-story">' + story + '</p>' + duetNote(card) + '<div class="result-actions"><button type="button" class="secondary-btn" data-share-card="' + card.id + '">' + t('shareEcho') + '</button><button type="button" class="primary-btn" data-next-field="1">' + t('nextSky') + '</button></div>'); }
   function renderChapterSheet() { var ch = chapterAt(state.chapter); setSheet(t('chapter'), t(ch.name), '<p class="sheet-intro">' + t('chapterIntro') + '</p><div class="encounter-row"><span class="lens-seal">◌</span><div><strong>' + t('observationCount',{count:state.stats.observations}) + '</strong><p>' + t('linksCount',{count:state.stats.links}) + '</p></div></div>'); }
   function renderMenuSheet() { setSheet(t('menu'), t('menuTitle'), '<p class="sheet-intro">' + t('menuIntro') + '</p><div class="menu-list"><div class="menu-row"><span class="lens-seal">⚙</span><div><strong>' + t('settings') + '</strong><p>' + t('language') + ' · ' + t('music') + '</p></div><button type="button" data-menu-action="settings">›</button></div><div class="menu-row"><span class="lens-seal">⌁</span><div><strong>' + t('leaderboard') + '</strong><p>' + t('observationCount',{count:state.stats.observations}) + '</p></div><button type="button" data-menu-action="leaderboard">›</button></div><div class="menu-row"><span class="lens-seal">★</span><div><strong>' + t('favorite') + '</strong><p>' + t('atlas') + '</p></div><button type="button" data-menu-action="favorite">›</button></div><div class="menu-row"><span class="lens-seal">⊙</span><div><strong>' + t('privacy') + '</strong><p>GamePush</p></div><button type="button" data-menu-action="privacy">›</button></div><div class="menu-row"><span class="lens-seal">↺</span><div><strong>' + t('reset') + '</strong><p>' + t('retry') + '</p></div><button type="button" data-menu-action="reset">›</button></div></div>'); }
   function renderSettingsSheet() {
@@ -332,8 +378,8 @@
   function unlockLens(id) { var lens = LENSES.filter(function (item) { return item.id === id; })[0]; if (!lens || state.lenses[id] || state.insight < lens.cost) return; state.insight -= lens.cost; state.lenses[id] = 1; audio('discovery'); haptic([10,28,10]); persist(); refreshSheet(); renderField(); }
   function toggleSetting(id) { if (!(id in state.settings)) return; state.settings[id] = !state.settings[id]; audio('setSettings', state.settings); persist(); renderField(); refreshSheet(); }
 
-  function encodeEcho(card) { var payload = { v: 3, seed: int(card.seed), chapter: int(card.chapter), family: String(card.family || 'line'), anomaly: anomalyById(card.anomaly).id }; try { return 'AE3.' + btoa(JSON.stringify(payload)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); } catch (e) { return ''; } }
-  function decodeEcho(code) { try { var raw = String(code || '').trim(); if (raw.indexOf('AE3.') !== 0) return null; var body = raw.slice(4).replace(/-/g,'+').replace(/_/g,'/'); while (body.length % 4) body += '='; var value = JSON.parse(atob(body)); if (!value || value.v !== 3 || !isFinite(value.seed) || value.chapter < 0 || value.chapter >= CHAPTERS.length || !ANOMALIES.some(function (item) { return item.id === value.anomaly; })) return null; return { seed:int(value.seed), chapter:int(value.chapter), family: typeof value.family === 'string' ? value.family : 'line', anomaly:value.anomaly }; } catch (e) { return null; } }
+  function encodeEcho(card) { var payload = { v: 4, seed: int(card.seed), chapter: int(card.chapter), family: String(card.family || 'line'), anomaly: anomalyById(card.anomaly).id, motif: motifById(card.motif).id }; try { return 'AE3.' + btoa(JSON.stringify(payload)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); } catch (e) { return ''; } }
+  function decodeEcho(code) { try { var raw = String(code || '').trim(); if (raw.indexOf('AE3.') !== 0) return null; var body = raw.slice(4).replace(/-/g,'+').replace(/_/g,'/'); while (body.length % 4) body += '='; var value = JSON.parse(atob(body)); if (!value || (value.v !== 3 && value.v !== 4) || !isFinite(value.seed) || value.chapter < 0 || value.chapter >= CHAPTERS.length || !ANOMALIES.some(function (item) { return item.id === value.anomaly; })) return null; return { seed:int(value.seed), chapter:int(value.chapter), family: typeof value.family === 'string' ? value.family : 'line', anomaly:value.anomaly, motif: value.v === 4 && MOTIFS[value.motif] ? value.motif : '' }; } catch (e) { return null; } }
   function echoCardBlob(card, code) {
     return new Promise(function (resolve) {
       try {
@@ -344,7 +390,7 @@
         var points = [[305,742],[354,388],[540,300],[745,398],[790,720],[540,845],[660,585]]; var signalCount = Math.min(points.length, card.signals.length || 5); ctx.strokeStyle = glow; ctx.lineWidth = 3; ctx.shadowBlur = 18; ctx.shadowColor = glow;
         (card.links || []).forEach(function (link, index) { var a = points[Number(String(link.a || '').replace(/\D/g,'')) % signalCount], b = points[Number(String(link.b || '').replace(/\D/g,'')) % signalCount]; if (!a || !b) return; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); });
         for (var i = 0; i < signalCount; i++) { var p = points[i]; var radial = ctx.createRadialGradient(p[0]-4,p[1]-4,2,p[0],p[1],23); radial.addColorStop(0,'#fff'); radial.addColorStop(.3,glow); radial.addColorStop(1,'rgba(117,228,239,0)'); ctx.fillStyle=radial; ctx.beginPath(); ctx.arc(p[0],p[1],23,0,Math.PI*2); ctx.fill(); }
-        ctx.shadowBlur=0; ctx.fillStyle='#efc875'; ctx.font='700 32px Manrope, Arial'; ctx.textAlign='center'; ctx.fillText(t('title').toUpperCase(),540,135); ctx.fillStyle='#f4f0df'; ctx.font='700 74px Georgia, serif'; ctx.fillText(t(card.title),540,1015); ctx.fillStyle='#c5c9d8'; ctx.font='500 28px Manrope, Arial'; ctx.fillText(t(anomaly.title),540,1063); ctx.fillStyle='#efc875'; ctx.font='700 24px Manrope, Arial'; ctx.fillText(code,540,1215); ctx.fillStyle='#8e98b6'; ctx.font='500 21px Manrope, Arial'; ctx.fillText(t('encounters'),540,1254);
+        var motif = motifById(card.motif); ctx.shadowBlur=0; ctx.fillStyle='#efc875'; ctx.font='700 32px Manrope, Arial'; ctx.textAlign='center'; ctx.fillText(t('title').toUpperCase(),540,135); ctx.fillStyle=card.marked ? '#efc875' : '#c5c9d8'; ctx.font='600 26px Manrope, Arial'; ctx.fillText(motif.glyph + ' ' + t(card.marked ? motif.mark : motif.name),540,950); ctx.fillStyle='#f4f0df'; ctx.font='700 74px Georgia, serif'; ctx.fillText(t(card.title),540,1015); ctx.fillStyle='#c5c9d8'; ctx.font='500 28px Manrope, Arial'; ctx.fillText(t(anomaly.title),540,1063); ctx.fillStyle='#efc875'; ctx.font='700 24px Manrope, Arial'; ctx.fillText(code,540,1215); ctx.fillStyle='#8e98b6'; ctx.font='500 21px Manrope, Arial'; ctx.fillText(t('encounters'),540,1254);
         canvas.toBlob(function (blob) { resolve(blob); }, 'image/png');
       } catch (e) { resolve(null); }
     });
@@ -361,7 +407,7 @@
     if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(function () { toast(t('copied')); }).catch(function () { toast(t('shareUnavailable')); }); return; }
     toast(t('shareUnavailable'));
   }
-  function importEcho() { var input = document.getElementById('echoCode'); var payload = decodeEcho(input && input.value); if (!payload) { toast(t('invalidCode')); return; } state.currentField = createField(payload.seed, payload.chapter, true, payload.anomaly); state.currentField.imported = true; state.currentField.challengeFamily = payload.family; selectedId=''; linkSource=''; mode='field-ready'; state.stats.imported++; persist(); closeSheet(); renderAll(); toast(t('imported')); }
+  function importEcho() { var input = document.getElementById('echoCode'); var payload = decodeEcho(input && input.value); if (!payload) { toast(t('invalidCode')); return; } state.currentField = createField(payload.seed, payload.chapter, true, payload.anomaly, payload.motif); state.currentField.imported = true; state.currentField.challengeFamily = payload.family; selectedId=''; linkSource=''; mode='field-ready'; state.stats.imported++; persist(); closeSheet(); renderAll(); toast(t('importedWithMotif', { name:t(activeMotif().name) })); }
 
   function menuAction(action) {
     if (action === 'settings') { currentSheet = 'settings'; refreshSheet(); return; }
@@ -397,9 +443,9 @@
   function demoState() {
     var sample = freshState(detectLanguage(), {music:true,effects:true,haptics:true,motion:true}); sample.chapter=2; sample.insight=5; sample.lenses={echo:1,mirror:1,horizon:1,hush:0}; sample.stats={observations:9,links:25,constellations:9,shared:2,imported:1,witnessed:9};
     sample.atlas = [
-      {id:'demo-1',seed:1425,chapter:1,signals:['pulse','whisper','beacon','ash'],links:[{a:'s0',b:'s1'},{a:'s1',b:'s2'},{a:'s2',b:'s3'}],family:'bridge',anomaly:'voice',decision:'preserve',title:'familyBridge',timestamp:now()-86400000},
-      {id:'demo-2',seed:8264,chapter:2,signals:['mirror','comet','whisper'],links:[{a:'s0',b:'s1'},{a:'s1',b:'s2'},{a:'s2',b:'s0'}],family:'loop',anomaly:'letter',decision:'release',title:'familyLoop',timestamp:now()-3600000}
-    ]; sample.currentField=createField(553189, sample.chapter, false, 'blind'); sample.currentField.listened=['s0','s1','s2']; sample.currentField.links=[{a:'s0',b:'s1'},{a:'s1',b:'s2'},{a:'s2',b:'s0'}]; return sample;
+      {id:'demo-1',seed:1425,chapter:1,signals:['pulse','whisper','beacon','ash'],links:[{a:'s0',b:'s1'},{a:'s1',b:'s2'},{a:'s2',b:'s3'}],family:'bridge',anomaly:'voice',decision:'preserve',title:'familyBridge',motif:'warm',marked:true,timestamp:now()-86400000},
+      {id:'demo-2',seed:8264,chapter:2,signals:['mirror','comet','whisper'],links:[{a:'s0',b:'s1'},{a:'s1',b:'s2'},{a:'s2',b:'s0'}],family:'loop',anomaly:'letter',decision:'release',title:'familyLoop',motif:'loop',marked:true,duet:'counterpoint',timestamp:now()-3600000}
+    ]; sample.currentField=createField(553189, sample.chapter, false, 'blind', 'loop'); sample.currentField.listened=['s0','s1','s2']; sample.currentField.links=[{a:'s0',b:'s1'},{a:'s1',b:'s2'},{a:'s2',b:'s0'}]; return sample;
   }
 
   function start() {

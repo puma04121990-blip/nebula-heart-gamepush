@@ -38,11 +38,11 @@ BOOT → FIELD_READY → LISTENING → FIELD_READY
 
 ## State schema and migration
 
-`SAVE_VERSION` becomes `3`. Migration remains additive and never deletes an old save merely because it lacks Atlas fields. Legacy idle values are retained as `legacyDust` for transparent acknowledgement but do not grant a competitive power advantage; the first migration creates one archival card, **«Первый отклик»**, based on the old lifetime value. Existing language and accessibility settings remain intact.
+`SAVE_VERSION` is `4`. Migration remains additive and accepts Atlas saves from version 3 onward; it never deletes an old save merely because it lacks Night Letter fields. Legacy idle values are retained as `legacyDust` for transparent acknowledgement but do not grant a competitive power advantage; the first migration creates one archival card, **«Первый отклик»**, based on the old lifetime value. Existing language and accessibility settings remain intact.
 
 ```js
 {
-  version: 3,
+  version: 4,
   lang: 'ru' | 'en',
   settings: { music, effects, haptics, motion },
   legacyDust: number,
@@ -58,6 +58,8 @@ BOOT → FIELD_READY → LISTENING → FIELD_READY
     links: Link[],
     listened: string[],
     anomaly: Anomaly | null,
+    motif: 'first' | 'warm' | 'loop' | 'mirror' | 'comet',
+    challengeFamily: string, // set only by an imported Echo
     status: 'ready' | 'resolved',
     createdAt: number
   },
@@ -82,11 +84,12 @@ A compact seeded pseudo-random generator builds each field. Its seed derives fro
 | 2. Signal selection | Weighted deterministic picks | Produces five to seven signals with no impossible intro combination. |
 | 3. Positions | Bounded polar coordinates | Keeps entities away from HUD, each other, safe areas and the central anomaly. |
 | 4. Anomaly test | Observation count + seed | Creates a rare encounter only after enough meaningful links. |
-| 5. Prompt | Signal/anomaly traits | Creates the short narrative guidance and outcome flavour. |
+| 5. Night Letter | Seed + actually available signal types | Selects one achievable authored motif and its localised guidance. |
+| 6. Prompt | Signal/anomaly traits + Night Letter state | Creates short narrative guidance, outcome flavour and the observer-mark ritual. |
 
 ## Data-driven content
 
-Signals, anomaly types, chapters, constellation families and lenses live as static configuration records in `game.js`. This makes later content additions possible without rewriting renderer logic.
+Signals, anomaly types, chapters, constellation families, lenses and Night Letter motifs live as static configuration records in `game.js`. This makes later content additions possible without rewriting renderer logic.
 
 | Data record | Required fields |
 | --- | --- |
@@ -94,7 +97,8 @@ Signals, anomaly types, chapters, constellation families and lenses live as stat
 | `AnomalyDefinition` | `id`, `minLinks`, `appearanceKey`, `preserveKey`, `releaseKey`, `memorySeal` |
 | `ConstellationFamily` | `id`, `test(links)`, `nameKey`, `accent`, `unlock` |
 | `LensDefinition` | `id`, `need`, `effect`, `titleKey`, `descriptionKey` |
-| `ChapterDefinition` | `id`, `requiredInsight`, `skyClass`, `signalPool`, `specialRule` |
+| ChapterDefinition | `id`, `requiredInsight`, `skyClass`, `signalPool`, `specialRule` |
+| `MotifDefinition` | `id`, `glyph`, `nameKey`, `hintKey`, `markKey`, `isAchieved(field)` |
 
 ## Rendering ownership
 
@@ -110,11 +114,11 @@ The thread layer is an SVG covering the field. It contains one `<path>` per conf
 
 ## Atlas and narrative persistence
 
-A resolved field serialises into an `AtlasCard` that captures `seed`, signal IDs, links, pattern family, anomaly decision, chapter, generated title key and timestamp. The card is an interactive data object: it can reopen a read-only map, be compared with a response from a friend, be used as a visual share card and inform future anomaly dialogue.
+A resolved field serialises into an `AtlasCard` that captures `seed`, signal IDs, links, pattern family, anomaly decision, chapter, generated title key, Night Letter `motif`, `marked` state, optional Echo `duet` relation and timestamp. The card is an interactive data object: it can reopen a read-only map, be compared with a response from a friend, be used as a visual share card and inform future anomaly dialogue.
 
 ## Echo challenge protocol
 
-An outgoing Echo contains only a versioned, URL-safe compact payload: `{ v, seed, chapter, sourceFamily, anomalyId }`. It intentionally excludes display name, account ID, cloud state and free-form text. The recipient validates payload shape and version before creating an `Encounter` field. If native share is unavailable, the player can copy the code. If a GamePush social overlay exists, `GPX.invite()` shares a plain-language invitation without assuming a specific social network API.
+An outgoing `AE3` Echo contains only a versioned, URL-safe compact payload: `{ v, seed, chapter, family, anomaly, motif }`. It intentionally excludes display name, account ID, cloud state, timestamp, personal decision and free-form text. The recipient validates payload shape and version before creating an `Encounter` field. When resolved, the response records a non-competitive `duet`: `harmony` for the same family or `counterpoint` for a different family. If native share is unavailable, the player can copy the code. If a GamePush social overlay exists, `GPX.share()` receives the card payload without assuming a specific social network API.
 
 ## Audio and lifecycle
 

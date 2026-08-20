@@ -158,3 +158,27 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(117, 228, 23
   .atlas-dock { padding:4px; border-radius:12px; }
   .atlas-dock button { min-height:35px; padding:5px 4px; }
 }
+
+/* Echo Season: Night Letters and observer marks */
+.brief-letter { grid-column:1 / -1; display:flex; align-items:center; min-width:0; margin-top:3px; color:rgba(239,200,117,.78) !important; font-size:10px !important; font-weight:800; letter-spacing:.025em; }
+.brief-letter::before { content:''; width:14px; height:1px; margin-right:6px; background:linear-gradient(90deg,var(--gold),transparent); }
+.brief-letter.is-complete { color:#fff1bd !important; text-shadow:0 0 9px rgba(239,200,117,.42); }
+.sky.motif-awake { box-shadow:inset 0 0 0 1px rgba(239,200,117,.2), inset 0 0 82px rgba(239,200,117,.10), inset 0 0 55px rgba(0,0,0,.36), 0 17px 50px rgba(0,0,0,.25), 0 0 26px rgba(239,200,117,.08); }
+.sky.motif-awake::after { border-color:rgba(239,200,117,.33); animation:letterOrbit 7s linear infinite; }
+.sky.motif-awake .thread-svg { filter:drop-shadow(0 0 7px rgba(239,200,117,.42)); }
+.sky[data-motif="warm"].motif-awake { background:radial-gradient(ellipse at 50% 48%, rgba(112,62,43,.26), rgba(21,31,57,.30) 43%, rgba(3,7,15,.78) 100%); }
+.sky[data-motif="loop"].motif-awake { background:radial-gradient(ellipse at 50% 48%, rgba(66,48,122,.30), rgba(13,22,53,.30) 43%, rgba(3,7,15,.78) 100%); }
+.sky[data-motif="mirror"].motif-awake { background:radial-gradient(ellipse at 50% 48%, rgba(79,115,151,.28), rgba(10,21,49,.30) 43%, rgba(3,7,15,.78) 100%); }
+.sky[data-motif="comet"].motif-awake { background:radial-gradient(ellipse at 50% 48%, rgba(74,111,173,.29), rgba(10,21,49,.30) 43%, rgba(3,7,15,.78) 100%); }
+.field-prompt.is-motif-awake { border-color:rgba(239,200,117,.5); background:rgba(24,21,38,.76); color:#fff4c8; box-shadow:0 0 18px rgba(239,200,117,.10); }
+.motif-badge { display:inline-flex; align-items:center; gap:6px; max-width:100%; margin:0 auto 11px; padding:5px 8px; border:1px solid rgba(239,200,117,.28); border-radius:999px; background:rgba(4,11,29,.40); color:var(--paper); font-size:10px; font-weight:800; line-height:1.15; }
+.motif-badge i { color:var(--gold); font-style:normal; font-size:15px; line-height:1; }
+.motif-badge.is-marked { border-color:rgba(239,200,117,.7); background:linear-gradient(105deg,rgba(100,77,39,.36),rgba(27,27,57,.38)); color:#fff2bd; box-shadow:0 0 14px rgba(239,200,117,.12); }
+.atlas-card .motif-badge { position:absolute; z-index:2; top:38px; left:11px; right:11px; width:max-content; max-width:calc(100% - 22px); margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.atlas-card .motif-badge span { overflow:hidden; text-overflow:ellipsis; }
+.duet-note,.mark-story { max-width:520px; margin:0 auto 12px; padding:8px 10px; border:1px solid rgba(117,228,239,.25); border-radius:10px; background:rgba(10,32,61,.36); color:var(--paper); font-size:12px; line-height:1.45; text-align:center; }
+.duet-note span { display:inline-grid; width:20px; height:20px; place-items:center; margin-right:5px; border:1px solid rgba(117,228,239,.4); border-radius:50%; color:var(--cyan); font-size:13px; vertical-align:middle; }
+.duet-note.counterpoint { border-color:rgba(170,139,255,.34); background:rgba(43,26,74,.33); }.duet-note.counterpoint span { border-color:rgba(170,139,255,.5); color:var(--violet); }
+.mark-story { border-color:rgba(239,200,117,.38); background:rgba(70,52,26,.25); color:#fff2bf; }
+@keyframes letterOrbit { to { transform:rotate(341deg) scaleY(.68); } }
+@media (max-height:500px) and (orientation:landscape) { .brief-letter { display:none; }.observation-brief { padding-top:8px; padding-bottom:7px; }.motif-badge { font-size:9px; } }
