@@ -1,5 +1,6 @@
 /*
-  Lightweight audio layer for Nebula Heart.
+ * Lightweight audio layer for Atlas of Echoes.
+
   Music starts only after a player gesture. Effects are synthesized through Web Audio.
 */
 (function (w) {
@@ -8,10 +9,10 @@
   var unlocked = false;
   var paused = false;
   var settings = { music: true, effects: true };
-  var music = new Audio('assets/nebula-ambient-loop.mp3');
+  var music = new Audio('assets/atlas-echoes-nocturne.mp3');
   music.loop = true;
   music.preload = 'metadata';
-  music.volume = 0.18;
+  music.volume = 0.16;
 
   function ensureContext() {
     if (context) return context;
@@ -27,6 +28,11 @@
     if (!unlocked || paused || !settings.music) {
       music.pause();
       return;
+    }
+    // A first user gesture authorizes both Web Audio and HTML media. Explicitly
+    // loading here makes the music request reliable in embedded WebViews too.
+    if (music.networkState === HTMLMediaElement.NETWORK_EMPTY) {
+      try { music.load(); } catch (e) {}
     }
     music.play().catch(function () {});
   }
@@ -86,6 +92,17 @@
       paused = false;
       if (unlocked && context && context.state === 'suspended') context.resume().catch(function () {});
       applyMusic();
+    },
+    getMusicStatus: function () {
+      return {
+        unlocked: unlocked,
+        enabled: settings.music,
+        paused: music.paused,
+        networkState: music.networkState,
+        readyState: music.readyState,
+        source: music.currentSrc || music.src,
+        error: music.error ? music.error.message : ''
+      };
     }
   };
 })(window);

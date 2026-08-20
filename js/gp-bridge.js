@@ -169,6 +169,11 @@
       return false;
     },
 
+    share: function (payload) {
+      if (!gp || !gp.socials || typeof gp.socials.share !== 'function') return false;
+      try { gp.socials.share(payload || {}); return true; } catch (e) { return false; }
+    },
+
     addFavorite: function () {
       if (!gp) return false;
       try {

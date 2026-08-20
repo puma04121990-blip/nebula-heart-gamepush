@@ -1,917 +1,411 @@
 (function () {
   'use strict';
 
-  var SAVE_VERSION = 2;
+  var SAVE_VERSION = 3;
   var LANG_KEY = 'nebula-heart-lang';
-  var BASE_COLLAPSE_NEED = 1000000;
-  var FORMS = [
-    { need: 0, color: '#7cf6ff' },
-    { need: 250, color: '#8ab4ff' },
-    { need: 4000, color: '#c084fc' },
-    { need: 60000, color: '#ff9ad5' },
-    { need: 900000, color: '#ffb86b' },
-    { need: 12000000, color: '#7dffb3' }
+  var TYPES = ['pulse', 'whisper', 'beacon', 'mirror', 'ash', 'comet'];
+  var POSITIONS = [[20,68],[25,26],[48,17],[75,27],[80,67],[49,79],[61,45]];
+  var SIGNALS = {
+    pulse: { name: 'sigPulse', trait: 'traitRhythm', tone: 430 },
+    whisper: { name: 'sigWhisper', trait: 'traitAttraction', tone: 520 },
+    beacon: { name: 'sigBeacon', trait: 'traitDirection', tone: 620 },
+    mirror: { name: 'sigMirror', trait: 'traitReflection', tone: 730 },
+    ash: { name: 'sigAsh', trait: 'traitFragility', tone: 310 },
+    comet: { name: 'sigComet', trait: 'traitPassing', tone: 810 }
+  };
+  var CHAPTERS = [
+    { id: 'silence', name: 'chSilence', pool: ['pulse','whisper','beacon','ash'] },
+    { id: 'tide', name: 'chTide', pool: ['pulse','whisper','mirror','beacon','ash'] },
+    { id: 'garden', name: 'chGarden', pool: ['whisper','beacon','mirror','ash','comet'] },
+    { id: 'deep', name: 'chDeep', pool: TYPES.slice() }
   ];
-  var ORBITS = [
-    { base: 15, prod: 0.1 }, { base: 100, prod: 1 }, { base: 1100, prod: 8 },
-    { base: 12000, prod: 47 }, { base: 130000, prod: 260 }, { base: 1400000, prod: 1400 }
+  var ANOMALIES = [
+    { id: 'voice', minLinks: 3, seal: '◉', title: 'anomalyVoiceTitle', intro: 'anomalyVoiceIntro', keep: 'anomalyVoiceKeep', keepHint: 'anomalyVoiceKeepHint', release: 'anomalyVoiceRelease', releaseHint: 'anomalyVoiceReleaseHint', keepStory: 'anomalyVoiceKeepStory', releaseStory: 'anomalyVoiceReleaseStory' },
+    { id: 'blind', minLinks: 3, seal: '◐', title: 'anomalyBlindTitle', intro: 'anomalyBlindIntro', keep: 'anomalyBlindKeep', keepHint: 'anomalyBlindKeepHint', release: 'anomalyBlindRelease', releaseHint: 'anomalyBlindReleaseHint', keepStory: 'anomalyBlindKeepStory', releaseStory: 'anomalyBlindReleaseStory' },
+    { id: 'letter', minLinks: 4, seal: '✦', title: 'anomalyLetterTitle', intro: 'anomalyLetterIntro', keep: 'anomalyLetterKeep', keepHint: 'anomalyLetterKeepHint', release: 'anomalyLetterRelease', releaseHint: 'anomalyLetterReleaseHint', keepStory: 'anomalyLetterKeepStory', releaseStory: 'anomalyLetterReleaseStory' }
   ];
-  var HARMONIES = [
-    { base: 20, kind: 'click', val: 1 }, { base: 250, kind: 'click', val: 5 },
-    { base: 800, kind: 'mult', val: 0.1 }, { base: 4000, kind: 'click', val: 25 },
-    { base: 25000, kind: 'mult', val: 0.25 }
-  ];
-  var SIGNALS = [
-    { key: 'Metro', base: 180 }, { key: 'Lens', base: 900 },
-    { key: 'Beacon', base: 2200 }, { key: 'Prism', base: 3500 }
-  ];
-  var REMS = [
-    { id: 'echo', name: 'remEcho', desc: 'remEchoD' }, { id: 'well', name: 'remWell', desc: 'remWellD' },
-    { id: 'span', name: 'remSpan', desc: 'remSpanD' }, { id: 'sight', name: 'remSight', desc: 'remSightD' }
-  ];
-  var RESEARCH = [
-    { base: 1 }, { base: 1 }, { base: 2 }, { base: 2 }, { base: 3 }, { base: 4 }
-  ];
-  var EXPEDITIONS = [
-    { id: 'drift', mins: 15, reward: 'dust' }, { id: 'beacon', mins: 30, reward: 'key' }, { id: 'archive', mins: 45, reward: 'focus' }
+  var LENSES = [
+    { id: 'echo', symbol: '≈', title: 'lensEcho', desc: 'lensEchoD', cost: 1 },
+    { id: 'mirror', symbol: '◌', title: 'lensMirror', desc: 'lensMirrorD', cost: 2 },
+    { id: 'horizon', symbol: '⌒', title: 'lensHorizon', desc: 'lensHorizonD', cost: 3 },
+    { id: 'hush', symbol: '∵', title: 'lensHush', desc: 'lensHushD', cost: 4 }
   ];
 
-  function n(value, fallback) {
-    value = Number(value);
-    return isFinite(value) && value >= 0 ? value : (fallback || 0);
-  }
-  function int(value, fallback) { return Math.floor(n(value, fallback)); }
-  function arr(source, length) {
-    var out = [];
-    for (var i = 0; i < length; i++) out.push(int(source && source[i], 0));
-    return out;
-  }
-  function dayKey(time) {
-    return new Date(time).toISOString().slice(0, 10);
-  }
-  function now() {
-    return typeof GPX !== 'undefined' && GPX.now ? GPX.now() : Date.now();
-  }
-  function defaultSettings(previous) {
-    previous = previous || {};
-    return {
-      music: previous.music !== false,
-      effects: previous.effects !== false,
-      haptics: previous.haptics !== false,
-      motion: previous.motion !== false
-    };
-  }
-  function emptyState(lang, settings) {
-    return {
-      version: SAVE_VERSION,
-      dust: 0,
-      total: 0,
-      orbits: arr(null, ORBITS.length),
-      harms: arr(null, HARMONIES.length),
-      signals: arr(null, SIGNALS.length),
-      remnants: 0,
-      rem: { echo: 0, well: 0, span: 0, sight: 0 },
-      gravity: 0,
-      focus: 0,
-      keys: 0,
-      research: arr(null, RESEARCH.length),
-      expedition: null,
-      contracts: { day: dayKey(now()), claimed: false },
-      daily: { clicks: 0, rifts: 0, dust: 0 },
-      stats: { clicks: 0, rifts: 0, collapses: 0, expeditions: 0, lifeDust: 0 },
-      discoveries: arr(null, FORMS.length),
-      maxForm: 0,
-      last: now(),
-      lang: lang || 'ru',
-      settings: defaultSettings(settings),
-      welcome: false
-    };
-  }
-
-  var state = emptyState('ru');
+  var state;
+  var mode = 'field-ready';
+  var selectedId = '';
+  var linkSource = '';
   var paused = false;
-  var combo = 0;
-  var comboUntil = 0;
-  var shopTab = 'orbits';
-  var sheetKind = '';
-  var lastTick = Date.now();
-  var lastHud = 0;
-  var lastSheetRefresh = 0;
-  var saveTimer = 0;
-  var tideAt = Date.now();
-  var nextRift = Date.now() + 18000;
-  var riftUntil = 0;
-  var riftChain = 0;
-  var riftChainUntil = 0;
-  var metroAt = 0;
-  var rewardBusy = false;
-  var previousFocus = null;
+  var currentSheet = '';
+  var sheetData = null;
+  var lastFocus = null;
+  var toastTimer = 0;
   var demoMode = /(?:[?&])demo(?:=1)?(?:&|$)/.test(window.location.search);
-  var demoSettingsMode = demoMode && /(?:[?&])settings=1(?:&|$)/.test(window.location.search);
 
   var el = {
-    boot: document.getElementById('boot'),
-    fill: document.getElementById('bootFill'),
-    app: document.getElementById('app'),
-    dust: document.getElementById('dust'),
-    rate: document.getElementById('rate'),
-    form: document.getElementById('formName'),
-    tide: document.getElementById('tideChip'),
-    evo: document.getElementById('evoLabel'),
-    evoFill: document.getElementById('evoFill'),
-    core: document.getElementById('core'),
-    combo: document.getElementById('combo'),
-    floats: document.getElementById('floatLayer'),
-    activityKicker: document.getElementById('activityKicker'),
-    activityTitle: document.getElementById('activityTitle'),
-    activityMeta: document.getElementById('activityMeta'),
-    activityFill: document.getElementById('activityFill'),
-    objectives: document.getElementById('btnObjectives'),
-    shop: document.getElementById('btnShop'),
-    collapse: document.getElementById('btnCollapse'),
-    reward: document.getElementById('btnReward'),
-    menu: document.getElementById('btnMenu'),
-    sheet: document.getElementById('sheet'),
-    sheetCard: document.querySelector('.sheet-card'),
-    sheetTitle: document.getElementById('sheetTitle'),
-    sheetBody: document.getElementById('sheetBody'),
-    sheetClose: document.getElementById('sheetClose'),
-    toast: document.getElementById('toast')
+    boot: document.getElementById('boot'), fill: document.getElementById('bootFill'), app: document.getElementById('app'),
+    chapterName: document.getElementById('chapterName'), fieldDay: document.getElementById('fieldDay'), fieldCount: document.getElementById('fieldCount'),
+    briefEyebrow: document.getElementById('briefEyebrow'), briefTitle: document.getElementById('briefTitle'), briefMeta: document.getElementById('briefMeta'), briefFill: document.getElementById('briefFill'),
+    sky: document.getElementById('sky'), signalLayer: document.getElementById('signalLayer'), threadSvg: document.getElementById('threadSvg'), anomaly: document.getElementById('anomalyNode'), fieldPrompt: document.getElementById('fieldPrompt'),
+    listen: document.getElementById('actListen'), connect: document.getElementById('actConnect'), witness: document.getElementById('actWitness'),
+    menu: document.getElementById('btnMenu'), chapter: document.getElementById('btnChapter'), brief: document.getElementById('btnBrief'), atlas: document.getElementById('btnAtlas'), lenses: document.getElementById('btnLenses'), encounters: document.getElementById('btnEncounters'),
+    sheet: document.getElementById('sheet'), sheetCard: document.querySelector('.sheet-card'), sheetKicker: document.getElementById('sheetKicker'), sheetTitle: document.getElementById('sheetTitle'), sheetBody: document.getElementById('sheetBody'), sheetClose: document.getElementById('sheetClose'), toast: document.getElementById('toast')
   };
 
-  function dict() { return (window.I18N && window.I18N[state.lang]) || window.I18N.ru; }
+  function n(value, fallback) { value = Number(value); return isFinite(value) && value >= 0 ? value : (fallback || 0); }
+  function int(value, fallback) { return Math.floor(n(value, fallback)); }
+  function bool(value, fallback) { return value == null ? !!fallback : value !== false; }
+  function now() { return window.GPX && GPX.now ? GPX.now() : Date.now(); }
+  function getDict() { return (window.I18N && window.I18N[state && state.lang]) || window.I18N.ru; }
   function t(key, vars) {
-    var value = dict()[key];
-    if (value == null) value = key;
-    if (vars) Object.keys(vars).forEach(function (name) {
-      value = String(value).replace(new RegExp('\\{' + name + '\\}', 'g'), vars[name]);
-    });
+    var value = getDict()[key];
+    if (value == null) return key;
+    value = String(value);
+    Object.keys(vars || {}).forEach(function (name) { value = value.replace(new RegExp('\\{' + name + '\}', 'g'), vars[name]); });
     return value;
   }
-  function savedLang() {
-    try {
-      var saved = localStorage.getItem(LANG_KEY);
-      return saved === 'ru' || saved === 'en' ? saved : '';
-    } catch (e) { return ''; }
-  }
-  function validLang(code) { return code === 'ru' || code === 'en'; }
-  function detectLang() {
-    var saved = savedLang();
+  function haptic(pattern) { if (state && state.settings.haptics && navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} } }
+  function audio(method, arg) { var engine = window.NebulaAudio; if (engine && typeof engine[method] === 'function') { try { engine[method](arg); } catch (e) {} } }
+  function unlockAudio() { if (state) audio('unlock', state.settings); }
+  function hash(value) { var h = 2166136261; String(value).split('').forEach(function (c) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }); return h >>> 0; }
+  function seeded(seed) { var x = (seed >>> 0) || 1; return function () { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return ((x >>> 0) % 100000) / 100000; }; }
+  function shuffle(list, rnd) { var a = list.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rnd() * (i + 1)); var q = a[i]; a[i] = a[j]; a[j] = q; } return a; }
+  function languageSaved() { try { var value = localStorage.getItem(LANG_KEY); return value === 'ru' || value === 'en' ? value : ''; } catch (e) { return ''; } }
+  function detectLanguage() {
+    var saved = languageSaved();
     if (saved) return saved;
-    var platform = typeof GPX !== 'undefined' ? GPX.platformLang() : '';
-    if (validLang(platform)) return platform;
+    var platform = window.GPX && GPX.platformLang ? GPX.platformLang() : '';
+    if (platform === 'ru' || platform === 'en') return platform;
     return (navigator.language || 'ru').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'ru';
   }
+  function defaultSettings(source) { source = source || {}; return { music: bool(source.music, true), effects: bool(source.effects, true), haptics: bool(source.haptics, true), motion: bool(source.motion, true) }; }
+  function dayIndex() { return Math.floor(now() / 86400000); }
+  function chapterAt(index) { return CHAPTERS[Math.max(0, Math.min(CHAPTERS.length - 1, index || 0))]; }
+  function anomalyById(id) { return ANOMALIES.filter(function (item) { return item.id === id; })[0] || ANOMALIES[0]; }
+  function chooseAnomaly(seed, chapter) { return ANOMALIES[Math.abs(int(seed) + int(chapter) * 7) % ANOMALIES.length]; }
+  function activeAnomaly() { return anomalyById(activeField().anomaly && activeField().anomaly.id); }
+
+  function freshState(language, settings) {
+    var seed = hash('first:' + dayIndex());
+    var fresh = {
+      version: SAVE_VERSION, lang: language || 'ru', settings: defaultSettings(settings), legacyDust: 0,
+      chapter: 0, chapterProgress: { resolved: 0, witnesses: 0 }, lenses: { echo: 0, mirror: 0, horizon: 0, hush: 0 }, insight: 0,
+      currentField: null, atlas: [], anomalyMemory: {}, encounters: [],
+      stats: { observations: 0, links: 0, constellations: 0, shared: 0, imported: 0, witnessed: 0 }, lastFieldAt: now(), welcome: false
+    };
+    fresh.currentField = createField(seed, 0, false);
+    return fresh;
+  }
+
+  function normaliseField(raw, chapter) {
+    if (!raw || !Array.isArray(raw.signals) || raw.signals.length < 4) return null;
+    var signals = raw.signals.slice(0, 7).map(function (item, index) {
+      var type = SIGNALS[item.type] ? item.type : TYPES[index % TYPES.length];
+      var pos = POSITIONS[index];
+      return { id: String(item.id || ('s' + index)), type: type, x: n(item.x, pos[0]), y: n(item.y, pos[1]) };
+    });
+    var ids = {}; signals.forEach(function (s) { ids[s.id] = true; });
+    var links = Array.isArray(raw.links) ? raw.links.filter(function (link) { return link && ids[link.a] && ids[link.b] && link.a !== link.b; }).slice(0, 12).map(function (link) { return { a: String(link.a), b: String(link.b) }; }) : [];
+    var listened = Array.isArray(raw.listened) ? raw.listened.filter(function (id) { return ids[id]; }).slice(0, signals.length) : [];
+    var storedAnomaly = anomalyById(raw.anomaly && raw.anomaly.id);
+    return { id: String(raw.id || ('field-' + now())), seed: int(raw.seed, hash(now())), chapter: int(raw.chapter, chapter), signals: signals, links: links, listened: listened, anomaly: { id: storedAnomaly.id, needed: Math.max(2, int(raw.anomaly && raw.anomaly.needed, storedAnomaly.minLinks)) }, mirrorEcho: !!raw.mirrorEcho, status: raw.status === 'resolved' ? 'resolved' : 'ready', imported: !!raw.imported, createdAt: n(raw.createdAt, now()) };
+  }
+
+  function migrate(data) {
+    if (!data || typeof data !== 'object') return freshState(detectLanguage());
+    if (int(data.version) >= SAVE_VERSION && data.currentField) {
+      var stateV3 = freshState(data.lang === 'en' || data.lang === 'ru' ? data.lang : detectLanguage(), data.settings);
+      stateV3.legacyDust = n(data.legacyDust);
+      stateV3.chapter = Math.min(CHAPTERS.length - 1, int(data.chapter));
+      stateV3.chapterProgress = { resolved: int(data.chapterProgress && data.chapterProgress.resolved), witnesses: int(data.chapterProgress && data.chapterProgress.witnesses) };
+      LENSES.forEach(function (lens) { stateV3.lenses[lens.id] = Math.min(1, int(data.lenses && data.lenses[lens.id])); });
+      stateV3.insight = int(data.insight);
+      stateV3.stats = Object.assign(stateV3.stats, data.stats || {});
+      stateV3.atlas = Array.isArray(data.atlas) ? data.atlas.filter(function (card) { return card && typeof card === 'object' && Array.isArray(card.signals); }).slice(0, 48) : [];
+      stateV3.anomalyMemory = data.anomalyMemory && typeof data.anomalyMemory === 'object' ? data.anomalyMemory : {};
+      stateV3.encounters = Array.isArray(data.encounters) ? data.encounters.slice(0, 12) : [];
+      stateV3.currentField = normaliseField(data.currentField, stateV3.chapter) || createField(hash('recover:' + now()), stateV3.chapter, false);
+      stateV3.lastFieldAt = n(data.lastFieldAt, now()); stateV3.welcome = !!data.welcome;
+      return stateV3;
+    }
+    var migrated = freshState(data.lang === 'en' || data.lang === 'ru' ? data.lang : detectLanguage(), data.settings || { music: data.sound !== false, effects: data.sound !== false });
+    migrated.legacyDust = n(data.total || data.dust);
+    migrated.stats.observations = Math.max(0, int(data.stats && data.stats.collapses));
+    if (migrated.legacyDust > 0) {
+      migrated.atlas.push({ id: 'legacy-' + now(), seed: hash('legacy:' + migrated.legacyDust), chapter: 0, signals: ['pulse','whisper','beacon'], links: [{a:'s0',b:'s1'},{a:'s1',b:'s2'}], family: 'bridge', decision: 'preserve', title: 'familyBridge', timestamp: now(), legacy: true });
+      migrated.insight = 1;
+    }
+    return migrated;
+  }
+
+  function createField(seed, chapter, imported, forcedAnomalyId) {
+    var rnd = seeded(seed); var ch = chapterAt(chapter); var anomaly = forcedAnomalyId ? anomalyById(forcedAnomalyId) : chooseAnomaly(seed, chapter); var count = 5 + ((state && state.lenses.horizon && rnd() > .42) ? 1 : 0);
+    var types = shuffle(ch.pool, rnd); var positions = shuffle(POSITIONS, rnd); var signals = [];
+    for (var i = 0; i < count; i++) signals.push({ id: 's' + i, type: types[i % types.length], x: positions[i][0] + Math.round((rnd() - .5) * 4), y: positions[i][1] + Math.round((rnd() - .5) * 4) });
+    return { id: 'field-' + seed + '-' + now(), seed: seed, chapter: chapter, signals: signals, links: [], listened: [], anomaly: { id: anomaly.id, needed: Math.max(2, anomaly.minLinks - (state && state.lenses.hush ? 1 : 0)) }, mirrorEcho: false, status: 'ready', imported: !!imported, createdAt: now() };
+  }
+
+  function activeField() { return state.currentField; }
+  function findSignal(id) { return activeField().signals.filter(function (signal) { return signal.id === id; })[0] || null; }
+  function isListened(id) { return activeField().listened.indexOf(id) >= 0; }
+  function hasLink(a, b) { return activeField().links.some(function (link) { return (link.a === a && link.b === b) || (link.a === b && link.b === a); }); }
+  function legalLink(a, b) {
+    if (!a || !b || a.id === b.id || hasLink(a.id, b.id)) return false;
+    // The first connection is an onboarding promise: two listened voices must always be able to meet.
+    if (!activeField().links.length) return true;
+    var ai = TYPES.indexOf(a.type), bi = TYPES.indexOf(b.type);
+    return ((ai + bi + activeField().seed) % 5 !== 0) || !!state.lenses.echo;
+  }
+  function compatibleIds(sourceId) {
+    var source = findSignal(sourceId); if (!source) return [];
+    return activeField().signals.filter(function (signal) { return isListened(signal.id) && legalLink(source, signal); }).map(function (signal) { return signal.id; });
+  }
+  function familyOf(field) {
+    var links = field.links; if (links.length < 2) return 'line';
+    var nodes = {}; links.forEach(function (link) { nodes[link.a] = (nodes[link.a] || 0) + 1; nodes[link.b] = (nodes[link.b] || 0) + 1; });
+    var degree = Object.keys(nodes).map(function (key) { return nodes[key]; });
+    if (links.length >= 3 && degree.some(function (value) { return value >= 3; })) return 'star';
+    if (links.length >= 3 && Object.keys(nodes).length <= links.length) return 'loop';
+    if (links.length >= 3) return 'bridge';
+    return 'line';
+  }
+  function familyKey(family) { return 'family' + family.charAt(0).toUpperCase() + family.slice(1); }
+  function patternKey(family) { return 'pattern' + family.charAt(0).toUpperCase() + family.slice(1); }
+  function soundFor(signal) { var type = signal && SIGNALS[signal.type]; audio('tap', type && type.type === 'ash' ? 'crit' : 'normal'); }
+
   function applyStaticI18n() {
     document.documentElement.lang = state.lang;
     document.title = t('title');
     document.querySelectorAll('[data-i18n]').forEach(function (node) { node.textContent = t(node.getAttribute('data-i18n')); });
     document.querySelectorAll('[data-i18n-aria]').forEach(function (node) { node.setAttribute('aria-label', t(node.getAttribute('data-i18n-aria'))); });
   }
-  function setLang(code) {
-    var next = validLang(code) ? code : 'ru';
-    if (state.lang === next) return;
-    state.lang = next;
-    try { localStorage.setItem(LANG_KEY, state.lang); } catch (e) {}
-    if (typeof GPX !== 'undefined') GPX.setLanguage(state.lang);
-    applyStaticI18n();
-    persist();
-    renderHud(true);
-    refreshOpenSheet();
-    toast(t('languageChanged', { name: t(next === 'ru' ? 'langRu' : 'langEn') }));
-    requestAnimationFrame(function () {
-      var active = el.sheetBody.querySelector('[data-lang="' + next + '"]');
-      if (active) active.focus();
+  function setLanguage(code) {
+    if (code !== 'ru' && code !== 'en') return;
+    state.lang = code; try { localStorage.setItem(LANG_KEY, code); } catch (e) {}
+    if (window.GPX) GPX.setLanguage(code); applyStaticI18n(); renderAll(); refreshSheet(); persist(); toast(t('languageChanged', { name: t(code === 'ru' ? 'langRu' : 'langEn') }));
+  }
+  function persist() { if (!demoMode && window.GPX) GPX.saveProgress(state, state.stats.observations); }
+  function toast(message) { clearTimeout(toastTimer); el.toast.textContent = message; el.toast.classList.remove('hidden'); toastTimer = setTimeout(function () { el.toast.classList.add('hidden'); }, 3000); }
+
+  function renderHud() {
+    var ch = chapterAt(state.chapter); var field = activeField();
+    el.chapterName.textContent = t(ch.name); el.fieldDay.textContent = t(field.imported ? 'sourceEcho' : 'fieldWindow'); el.fieldCount.textContent = t('records', { count: state.atlas.length });
+    var progress = Math.min(100, Math.round((field.links.length / field.anomaly.needed) * 100));
+    el.briefEyebrow.textContent = t(field.imported ? 'sourceEcho' : 'observation');
+    if (field.links.length >= field.anomaly.needed) { el.briefTitle.textContent = t(activeAnomaly().title); el.briefMeta.textContent = t('anomalyReady'); }
+    else if (!field.listened.length) { el.briefTitle.textContent = t('listenSky'); el.briefMeta.textContent = t('chooseSignal'); }
+    else { el.briefTitle.textContent = t('connect'); el.briefMeta.textContent = t('linksCount', { count: field.links.length }); }
+    el.briefFill.style.width = progress + '%';
+  }
+
+  function renderThreads() {
+    var field = activeField(); var pathData = '';
+    field.links.forEach(function (link) {
+      var a = findSignal(link.a), b = findSignal(link.b); if (!a || !b) return;
+      var family = familyOf(field); pathData += '<path class="family-' + family + '" d="M ' + a.x + ' ' + a.y + ' L ' + b.x + ' ' + b.y + '"></path><circle cx="' + a.x + '" cy="' + a.y + '" r=".75"></circle><circle cx="' + b.x + '" cy="' + b.y + '" r=".75"></circle>';
+    });
+    if (field.mirrorEcho && field.links.length) { var last = field.links[field.links.length - 1], ma = findSignal(last.a), mb = findSignal(last.b); if (ma && mb) pathData += '<circle class="mirror-glint" cx="' + ((ma.x + mb.x) / 2) + '" cy="' + ((ma.y + mb.y) / 2) + '" r="1.7"></circle>'; }
+    el.threadSvg.innerHTML = pathData;
+  }
+  function promptForField() {
+    var field = activeField(); var selected = findSignal(selectedId);
+    if (field.links.length >= field.anomaly.needed) return t(activeAnomaly().title) + ' — ' + t('anomalyReady');
+    if (mode === 'link-source') return t('chooseLinkSource');
+    if (mode === 'link-target') return t('chooseLinkTarget');
+    if (selected && isListened(selected.id)) return t('listenedSignal', { name: t(SIGNALS[selected.type].name), trait: t(SIGNALS[selected.type].trait) });
+    if (selected) return t('selectedSignal', { name: t(SIGNALS[selected.type].name) });
+    return t('fieldStart');
+  }
+  function renderField() {
+    var field = activeField(); var compatible = mode === 'link-target' ? compatibleIds(linkSource) : [];
+    el.signalLayer.innerHTML = field.signals.map(function (signal) {
+      var classes = ['signal', signal.type];
+      if (signal.id === selectedId || signal.id === linkSource) classes.push('is-selected');
+      if (isListened(signal.id)) classes.push('is-listened');
+      if (field.links.some(function (link) { return link.a === signal.id || link.b === signal.id; })) classes.push('is-linked');
+      if (compatible.indexOf(signal.id) >= 0) classes.push('is-compatible');
+      var name = t(SIGNALS[signal.type].name), trait = t(SIGNALS[signal.type].trait);
+      return '<button type="button" class="' + classes.join(' ') + '" data-signal="' + signal.id + '" style="left:' + signal.x + '%;top:' + signal.y + '%" aria-label="' + name + (isListened(signal.id) ? ': ' + trait : '') + '"><span class="signal-orb" aria-hidden="true"></span><span class="signal-label">' + name + '<small>' + trait + '</small></span></button>';
+    }).join('');
+    renderThreads(); el.anomaly.classList.toggle('hidden', field.links.length < field.anomaly.needed);
+    el.fieldPrompt.textContent = promptForField();
+    var noSelection = !selectedId || !isListened(selectedId);
+    el.listen.disabled = paused || !selectedId || isListened(selectedId) || field.status === 'resolved';
+    el.connect.disabled = paused || field.status === 'resolved' || (mode !== 'link-source' && (field.listened.length < 2));
+    el.witness.disabled = paused || field.status === 'resolved' || field.links.length < field.anomaly.needed;
+    el.listen.classList.toggle('is-active', !!selectedId && !isListened(selectedId));
+    el.connect.classList.toggle('is-active', mode === 'link-source' || mode === 'link-target');
+    el.witness.classList.toggle('is-active', field.links.length >= field.anomaly.needed);
+    el.sky.classList.toggle('motion-off', !state.settings.motion);
+  }
+  function renderAll() { renderHud(); renderField(); }
+
+  function selectSignal(id) {
+    if (paused || activeField().status === 'resolved') return;
+    unlockAudio(); var signal = findSignal(id); if (!signal) return;
+    if (mode === 'link-source') {
+      if (!isListened(id)) { toast(t('needListen')); return; }
+      linkSource = id; selectedId = id; mode = 'link-target'; haptic(10); renderField(); return;
+    }
+    if (mode === 'link-target') {
+      var source = findSignal(linkSource);
+      if (id === linkSource) { mode = 'field-ready'; linkSource = ''; renderField(); return; }
+      if (!isListened(id)) { toast(t('needListen')); return; }
+      if (!legalLink(source, signal)) { toast(t('invalidLink')); haptic([12,30,12]); return; }
+      activeField().links.push({ a: linkSource, b: id }); if (state.lenses.mirror && !activeField().mirrorEcho && (source.type === 'mirror' || signal.type === 'mirror')) activeField().mirrorEcho = true; state.stats.links++; selectedId = id; linkSource = ''; mode = 'field-ready'; audio('rift'); haptic(16);
+      if (activeField().links.length >= activeField().anomaly.needed) audio('riftOpen');
+      renderAll(); persist(); return;
+    }
+    selectedId = id; mode = 'field-ready'; soundFor(signal); haptic(6); renderField();
+  }
+  function listenSelected() {
+    if (paused || !selectedId) { toast(t('chooseSignal')); return; }
+    var signal = findSignal(selectedId); if (!signal || isListened(signal.id)) return;
+    unlockAudio(); activeField().listened.push(signal.id); mode = 'field-ready'; audio('research'); haptic(12); renderField(); persist();
+  }
+  function beginConnect() {
+    if (paused) return;
+    unlockAudio(); if (mode === 'link-source' || mode === 'link-target') { mode = 'field-ready'; linkSource = ''; renderField(); return; }
+    if (activeField().listened.length < 2) { toast(t('needTwoSignals')); return; }
+    mode = 'link-source'; linkSource = ''; renderField();
+  }
+  function openAnomaly() { if (activeField().links.length < activeField().anomaly.needed) { toast(t('needMoreLinks', { count: activeField().anomaly.needed - activeField().links.length })); return; } openSheet('anomaly'); }
+  function resolveAnomaly(decision) {
+    var field = activeField(), family = familyOf(field), anomaly = activeAnomaly(); var card = {
+      id: 'card-' + now() + '-' + Math.round(Math.random() * 999), seed: field.seed, chapter: field.chapter, signals: field.signals.map(function (s) { return s.type; }), links: field.links.slice(), family: family, anomaly: anomaly.id, decision: decision, title: familyKey(family), timestamp: now(), imported: field.imported
+    };
+    field.status = 'resolved'; state.atlas.unshift(card); state.atlas = state.atlas.slice(0, 48); state.insight++; state.stats.observations++; state.stats.constellations++; state.stats.witnessed++; state.chapterProgress.resolved++; state.chapterProgress.witnesses++;
+    var memory = state.anomalyMemory[anomaly.id] || { seen: 0, preserved: 0, released: 0 }; memory.seen++; if (decision === 'preserve') memory.preserved++; else memory.released++; state.anomalyMemory[anomaly.id] = memory;
+    if (field.imported) { state.stats.imported++; state.encounters.unshift({ source: card.seed, response: card.id, timestamp: now() }); state.encounters = state.encounters.slice(0,12); }
+    if (state.chapter < CHAPTERS.length - 1 && state.chapterProgress.resolved >= 4) { state.chapter++; state.chapterProgress = { resolved: 0, witnesses: 0 }; toast(t('newChapter', { name: t(chapterAt(state.chapter).name) })); audio('discovery'); }
+    else audio('reward'); haptic([10,28,18]); persist(); openSheet('result', card); renderAll();
+  }
+  function nextField() { var nextSeed = hash('field:' + state.chapter + ':' + state.stats.observations + ':' + dayIndex() + ':' + now()); state.currentField = createField(nextSeed, state.chapter, false); selectedId = ''; linkSource = ''; mode = 'field-ready'; closeSheet(); renderAll(); persist(); }
+
+  function openSheet(kind, data) {
+    lastFocus = document.activeElement; currentSheet = kind; sheetData = data || null; el.sheet.classList.remove('hidden'); el.sheet.setAttribute('aria-hidden','false'); refreshSheet(); setTimeout(function () { el.sheetCard.focus(); }, 0);
+  }
+  function closeSheet() { el.sheet.classList.add('hidden'); el.sheet.setAttribute('aria-hidden','true'); currentSheet = ''; sheetData = null; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+  function setSheet(kicker, title, content) { el.sheetKicker.textContent = kicker || ''; el.sheetTitle.textContent = title; el.sheetBody.innerHTML = content; }
+  function refreshSheet() {
+    if (!currentSheet) return;
+    if (currentSheet === 'atlas') renderAtlasSheet();
+    else if (currentSheet === 'lenses') renderLensesSheet();
+    else if (currentSheet === 'encounters') renderEncountersSheet();
+    else if (currentSheet === 'menu') renderMenuSheet();
+    else if (currentSheet === 'settings') renderSettingsSheet();
+    else if (currentSheet === 'anomaly') renderAnomalySheet();
+    else if (currentSheet === 'result') renderResultSheet(sheetData);
+    else if (currentSheet === 'record') renderRecordSheet(sheetData);
+    else if (currentSheet === 'chapter') renderChapterSheet();
+  }
+
+  function miniLines(card) { var count = Math.min(4, card.links.length); var html = '<div class="mini-sky"></div>'; for (var i=0;i<count;i++) html += '<i class="mini-line" style="left:' + (18+i*11) + '%;top:' + (34+i*10) + '%;width:' + (34-i*3) + '%;transform:rotate(' + (-18+i*29) + 'deg)"></i>'; return html; }
+  function renderAtlasSheet() {
+    var cards = state.atlas.map(function (card) { return '<button type="button" class="atlas-card" data-card="' + card.id + '" style="--card-glow:' + (card.decision === 'preserve' ? 'rgba(117,228,239,.22)' : 'rgba(170,139,255,.22)') + '">' + miniLines(card) + '<span class="card-top"><span>' + t('recordKicker') + '</span><span>' + t(familyKey(card.family)) + '</span></span><strong>' + t(card.title) + '</strong><small>' + t('recordSignals',{count:card.signals.length,links:card.links.length}) + '</small></button>'; }).join('');
+    var memoryRows = ANOMALIES.filter(function (anomaly) { return state.anomalyMemory[anomaly.id]; }).map(function (anomaly) { var memory = state.anomalyMemory[anomaly.id]; return '<div class="encounter-row"><span class="lens-seal">' + anomaly.seal + '</span><div><strong>' + t(anomaly.title) + '</strong><p>' + t('witnessCount',{count:memory.seen}) + ' · ' + t(anomaly.keep) + ': ' + memory.preserved + ' · ' + t(anomaly.release) + ': ' + memory.released + '</p></div></div>'; }).join('');
+    setSheet(t('atlas'), t('atlasTitle'), '<p class="sheet-intro">' + t('atlasIntro') + '</p>' + (cards ? '<div class="atlas-grid">' + cards + '</div>' : '<div class="empty">' + t('noAtlas') + '</div>') + '<span class="section-label">' + t('memory') + '</span>' + (memoryRows ? '<div class="encounter-list">' + memoryRows + '</div>' : '<div class="empty">' + t('memoryEmpty') + '</div>'));
+  }
+  function renderRecordSheet(card) {
+    if (!card) { openSheet('atlas'); return; }
+    var anomaly = anomalyById(card.anomaly); var story = t(card.decision === 'preserve' ? anomaly.keepStory : anomaly.releaseStory, { pattern: t(patternKey(card.family)) });
+    setSheet(t('recordKicker'), t(card.title), '<div class="result-seal">' + anomaly.seal + '</div><h3 class="result-title">' + t('recordOf',{name:t(card.title)}) + '</h3><p class="result-story">' + story + '</p><div class="encounter-row"><span class="lens-seal">' + anomaly.seal + '</span><div><strong>' + t(anomaly.title) + '</strong><p>' + t('recordSignals',{count:card.signals.length,links:card.links.length}) + '</p></div></div><div class="result-actions"><button type="button" class="secondary-btn" data-share-card="' + card.id + '">' + t('shareEcho') + '</button><button type="button" class="primary-btn" data-next-field="1">' + t('nextSky') + '</button></div>');
+  }
+  function renderLensesSheet() {
+    var rows = LENSES.map(function (lens) { var unlocked = !!state.lenses[lens.id]; var enough = state.insight >= lens.cost; return '<div class="lens-row"><span class="lens-seal">' + lens.symbol + '</span><div><strong>' + t(lens.title) + '</strong><p>' + t(lens.desc) + '</p></div><button type="button" data-lens="' + lens.id + '" ' + (unlocked || !enough ? 'disabled' : '') + '>' + (unlocked ? t('unlocked') : t('unlock',{count:lens.cost})) + '</button></div>'; }).join('');
+    setSheet(t('lenses'), t('lensesTitle'), '<p class="sheet-intro">' + t('lensesIntro') + ' <strong>' + t('insight') + ': ' + state.insight + '</strong>.</p><div class="lens-list">' + rows + '</div>');
+  }
+  function renderEncountersSheet() {
+    var list = state.encounters.length ? state.encounters.map(function (encounter) { return '<div class="encounter-row"><span class="lens-seal">↗</span><div><strong>' + t('sourceEcho') + '</strong><p>' + t('yourEcho') + ' · ' + new Date(encounter.timestamp).toLocaleDateString(state.lang) + '</p></div></div>'; }).join('') : '<div class="empty">' + t('noEncounters') + '</div>';
+    setSheet(t('encounters'), t('encountersTitle'), '<p class="sheet-intro">' + t('encountersIntro') + '</p><div class="share-code"><input id="echoCode" autocomplete="off" placeholder="AE3.…" aria-label="' + t('importCode') + '"><button type="button" class="primary-btn" data-import-echo="1">' + t('import') + '</button></div><span class="section-label">' + t('encounters') + '</span><div class="encounter-list">' + list + '</div>');
+  }
+  function renderAnomalySheet() { var anomaly = activeAnomaly(); setSheet(t('anomaly'), t(anomaly.title), '<p class="sheet-intro">' + t(anomaly.intro) + '</p><div class="decision-grid"><button type="button" class="decision preserve" data-decision="preserve"><span class="decision-mark">' + anomaly.seal + '</span><strong>' + t(anomaly.keep) + '</strong><p>' + t(anomaly.keepHint) + '</p></button><button type="button" class="decision release" data-decision="release"><span class="decision-mark">✧</span><strong>' + t(anomaly.release) + '</strong><p>' + t(anomaly.releaseHint) + '</p></button></div>'); }
+  function renderResultSheet(card) { var anomaly = anomalyById(card.anomaly); var story = t(card.decision === 'preserve' ? anomaly.keepStory : anomaly.releaseStory,{pattern:t(patternKey(card.family))}); setSheet(t('recordKicker'), t('recordCreated'), '<div class="result-seal">' + anomaly.seal + '</div><h3 class="result-title">' + t(card.title) + '</h3><p class="result-story">' + story + '</p><div class="result-actions"><button type="button" class="secondary-btn" data-share-card="' + card.id + '">' + t('shareEcho') + '</button><button type="button" class="primary-btn" data-next-field="1">' + t('nextSky') + '</button></div>'); }
+  function renderChapterSheet() { var ch = chapterAt(state.chapter); setSheet(t('chapter'), t(ch.name), '<p class="sheet-intro">' + t('chapterIntro') + '</p><div class="encounter-row"><span class="lens-seal">◌</span><div><strong>' + t('observationCount',{count:state.stats.observations}) + '</strong><p>' + t('linksCount',{count:state.stats.links}) + '</p></div></div>'); }
+  function renderMenuSheet() { setSheet(t('menu'), t('menuTitle'), '<p class="sheet-intro">' + t('menuIntro') + '</p><div class="menu-list"><div class="menu-row"><span class="lens-seal">⚙</span><div><strong>' + t('settings') + '</strong><p>' + t('language') + ' · ' + t('music') + '</p></div><button type="button" data-menu-action="settings">›</button></div><div class="menu-row"><span class="lens-seal">⌁</span><div><strong>' + t('leaderboard') + '</strong><p>' + t('observationCount',{count:state.stats.observations}) + '</p></div><button type="button" data-menu-action="leaderboard">›</button></div><div class="menu-row"><span class="lens-seal">★</span><div><strong>' + t('favorite') + '</strong><p>' + t('atlas') + '</p></div><button type="button" data-menu-action="favorite">›</button></div><div class="menu-row"><span class="lens-seal">⊙</span><div><strong>' + t('privacy') + '</strong><p>GamePush</p></div><button type="button" data-menu-action="privacy">›</button></div><div class="menu-row"><span class="lens-seal">↺</span><div><strong>' + t('reset') + '</strong><p>' + t('retry') + '</p></div><button type="button" data-menu-action="reset">›</button></div></div>'); }
+  function renderSettingsSheet() {
+    function toggle(id, title, hint) { var on = state.settings[id] !== false; return '<div class="set-row"><div><strong>' + t(title) + '</strong><span>' + t(hint) + '</span></div><button type="button" class="setting-switch ' + (on ? 'is-on' : '') + '" role="switch" aria-checked="' + on + '" data-setting="' + id + '"><span>' + t(on ? 'on' : 'off') + '</span><i class="switch-track"><b class="switch-thumb"></b></i></button></div>'; }
+    var lang = function (code) { var active = state.lang === code; return '<button type="button" class="language-option ' + (active ? 'is-active' : '') + '" data-lang="' + code + '" aria-pressed="' + active + '"><span class="language-code">' + code.toUpperCase() + '</span><span class="language-name">' + t(code === 'ru' ? 'langRu' : 'langEn') + '</span><span class="language-check">' + (active ? '✓' : '') + '</span></button>'; };
+    setSheet(t('settings'), t('settings'), '<div class="settings-group"><h3>' + t('language') + '</h3><p class="sheet-intro">' + t('languageHint') + '</p><div class="lang-switch">' + lang('ru') + lang('en') + '</div></div><div class="settings-group"><h3>' + t('menuTitle') + '</h3>' + toggle('music','music','musicHint') + toggle('effects','effects','effectsHint') + toggle('haptics','haptics','hapticsHint') + toggle('motion','motion','motionHint') + '</div>');
+  }
+
+  function unlockLens(id) { var lens = LENSES.filter(function (item) { return item.id === id; })[0]; if (!lens || state.lenses[id] || state.insight < lens.cost) return; state.insight -= lens.cost; state.lenses[id] = 1; audio('discovery'); haptic([10,28,10]); persist(); refreshSheet(); renderField(); }
+  function toggleSetting(id) { if (!(id in state.settings)) return; state.settings[id] = !state.settings[id]; audio('setSettings', state.settings); persist(); renderField(); refreshSheet(); }
+
+  function encodeEcho(card) { var payload = { v: 3, seed: int(card.seed), chapter: int(card.chapter), family: String(card.family || 'line'), anomaly: anomalyById(card.anomaly).id }; try { return 'AE3.' + btoa(JSON.stringify(payload)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); } catch (e) { return ''; } }
+  function decodeEcho(code) { try { var raw = String(code || '').trim(); if (raw.indexOf('AE3.') !== 0) return null; var body = raw.slice(4).replace(/-/g,'+').replace(/_/g,'/'); while (body.length % 4) body += '='; var value = JSON.parse(atob(body)); if (!value || value.v !== 3 || !isFinite(value.seed) || value.chapter < 0 || value.chapter >= CHAPTERS.length || !ANOMALIES.some(function (item) { return item.id === value.anomaly; })) return null; return { seed:int(value.seed), chapter:int(value.chapter), family: typeof value.family === 'string' ? value.family : 'line', anomaly:value.anomaly }; } catch (e) { return null; } }
+  function echoCardBlob(card, code) {
+    return new Promise(function (resolve) {
+      try {
+        var canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1350; var ctx = canvas.getContext('2d'); if (!ctx) { resolve(null); return; }
+        var anomaly = anomalyById(card.anomaly); var glow = card.decision === 'preserve' ? '#75e4ef' : '#aa8bff';
+        var background = ctx.createLinearGradient(0, 0, 1080, 1350); background.addColorStop(0, '#101f48'); background.addColorStop(.48, '#0a1430'); background.addColorStop(1, '#060a15'); ctx.fillStyle = background; ctx.fillRect(0, 0, 1080, 1350);
+        ctx.strokeStyle = 'rgba(239,200,117,.42)'; ctx.lineWidth = 3; ctx.strokeRect(42, 42, 996, 1266); ctx.strokeStyle = 'rgba(117,228,239,.19)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(540, 590, 355, 0, Math.PI * 2); ctx.stroke();
+        var points = [[305,742],[354,388],[540,300],[745,398],[790,720],[540,845],[660,585]]; var signalCount = Math.min(points.length, card.signals.length || 5); ctx.strokeStyle = glow; ctx.lineWidth = 3; ctx.shadowBlur = 18; ctx.shadowColor = glow;
+        (card.links || []).forEach(function (link, index) { var a = points[Number(String(link.a || '').replace(/\D/g,'')) % signalCount], b = points[Number(String(link.b || '').replace(/\D/g,'')) % signalCount]; if (!a || !b) return; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); });
+        for (var i = 0; i < signalCount; i++) { var p = points[i]; var radial = ctx.createRadialGradient(p[0]-4,p[1]-4,2,p[0],p[1],23); radial.addColorStop(0,'#fff'); radial.addColorStop(.3,glow); radial.addColorStop(1,'rgba(117,228,239,0)'); ctx.fillStyle=radial; ctx.beginPath(); ctx.arc(p[0],p[1],23,0,Math.PI*2); ctx.fill(); }
+        ctx.shadowBlur=0; ctx.fillStyle='#efc875'; ctx.font='700 32px Manrope, Arial'; ctx.textAlign='center'; ctx.fillText(t('title').toUpperCase(),540,135); ctx.fillStyle='#f4f0df'; ctx.font='700 74px Georgia, serif'; ctx.fillText(t(card.title),540,1015); ctx.fillStyle='#c5c9d8'; ctx.font='500 28px Manrope, Arial'; ctx.fillText(t(anomaly.title),540,1063); ctx.fillStyle='#efc875'; ctx.font='700 24px Manrope, Arial'; ctx.fillText(code,540,1215); ctx.fillStyle='#8e98b6'; ctx.font='500 21px Manrope, Arial'; ctx.fillText(t('encounters'),540,1254);
+        canvas.toBlob(function (blob) { resolve(blob); }, 'image/png');
+      } catch (e) { resolve(null); }
     });
   }
-  function fmt(value) {
-    if (!isFinite(value)) return '0';
-    var abs = Math.abs(value);
-    if (abs < 1000) return (Math.round(value * 10) / 10).toString();
-    var units = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi'];
-    var index = Math.min(units.length - 1, Math.floor(Math.log10(abs) / 3));
-    return (value / Math.pow(1000, index)).toFixed(2) + units[index];
+  async function shareCard(id) {
+    var card = state.atlas.filter(function (item) { return item.id === id; })[0]; if (!card) { toast(t('cannotShare')); return; }
+    var code = encodeEcho(card); if (!code) return; var text = t('shareText',{code:code}); state.stats.shared++; persist();
+    if (window.GPX && GPX.share && GPX.share({ title:t('title'), text:text })) { toast(t('shareSent')); return; }
+    var blob = await echoCardBlob(card, code); var file = blob ? new File([blob], 'atlas-echo-' + card.id + '.png', { type:'image/png' }) : null;
+    try {
+      if (file && navigator.share && (!navigator.canShare || navigator.canShare({ files:[file] }))) { await navigator.share({ title:t('title'), text:text, files:[file] }); toast(t('shareSent')); return; }
+      if (navigator.share) { await navigator.share({ title:t('title'), text:text }); toast(t('shareSent')); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(function () { toast(t('copied')); }).catch(function () { toast(t('shareUnavailable')); }); return; }
+    toast(t('shareUnavailable'));
   }
-  function fmtTime(seconds) {
-    seconds = Math.max(0, Math.ceil(seconds));
-    var h = Math.floor(seconds / 3600);
-    var m = Math.floor((seconds % 3600) / 60);
-    var s = seconds % 60;
-    if (h) return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-    return m + ':' + String(s).padStart(2, '0');
+  function importEcho() { var input = document.getElementById('echoCode'); var payload = decodeEcho(input && input.value); if (!payload) { toast(t('invalidCode')); return; } state.currentField = createField(payload.seed, payload.chapter, true, payload.anomaly); state.currentField.imported = true; state.currentField.challengeFamily = payload.family; selectedId=''; linkSource=''; mode='field-ready'; state.stats.imported++; persist(); closeSheet(); renderAll(); toast(t('imported')); }
+
+  function menuAction(action) {
+    if (action === 'settings') { currentSheet = 'settings'; refreshSheet(); return; }
+    if (action === 'leaderboard') { if (!(window.GPX && GPX.openLeaderboard && GPX.openLeaderboard())) toast(t('shareUnavailable')); return; }
+    if (action === 'favorite') { if (!(window.GPX && GPX.addFavorite && GPX.addFavorite())) toast(t('shareUnavailable')); return; }
+    if (action === 'privacy') { if (!(window.GPX && GPX.openPrivacy && GPX.openPrivacy())) toast(t('shareUnavailable')); return; }
+    if (action === 'reset') { if (window.confirm(t('resetConfirm'))) { state = freshState(state.lang, state.settings); selectedId=''; linkSource=''; mode='field-ready'; persist(); closeSheet(); renderAll(); } }
   }
-  function costOf(base, level) { return Math.floor(base * Math.pow(1.15, level)); }
-  function rem(id) { return int(state.rem && state.rem[id], 0); }
-  function research(index) { return int(state.research[index], 0); }
-  function audio(method, arg) {
-    var engine = window.NebulaAudio;
-    if (engine && typeof engine[method] === 'function') {
-      try { engine[method](arg); } catch (e) {}
-    }
-  }
-  function haptic(pattern) {
-    if (state.settings.haptics && navigator.vibrate) {
-      try { navigator.vibrate(pattern); } catch (e) {}
-    }
+
+  function bindEvents() {
+    el.signalLayer.addEventListener('click', function (event) { var button = event.target.closest('[data-signal]'); if (button) selectSignal(button.getAttribute('data-signal')); });
+    el.listen.addEventListener('click', listenSelected); el.connect.addEventListener('click', beginConnect); el.witness.addEventListener('click', openAnomaly); el.anomaly.addEventListener('click', openAnomaly);
+    el.menu.addEventListener('click', function () { openSheet('menu'); }); el.chapter.addEventListener('click', function () { openSheet('chapter'); }); el.brief.addEventListener('click', function () { openSheet('chapter'); }); el.atlas.addEventListener('click', function () { openSheet('atlas'); }); el.lenses.addEventListener('click', function () { openSheet('lenses'); }); el.encounters.addEventListener('click', function () { openSheet('encounters'); }); el.sheetClose.addEventListener('click', closeSheet);
+    el.sheet.addEventListener('click', function (event) { if (event.target === el.sheet) closeSheet(); });
+    el.sheetBody.addEventListener('click', function (event) {
+      var node = event.target.closest('button'); if (!node) return;
+      if (node.hasAttribute('data-card')) { var card = state.atlas.filter(function (item) { return item.id === node.getAttribute('data-card'); })[0]; currentSheet='record'; sheetData=card; refreshSheet(); }
+      else if (node.hasAttribute('data-lens')) unlockLens(node.getAttribute('data-lens'));
+      else if (node.hasAttribute('data-decision')) resolveAnomaly(node.getAttribute('data-decision'));
+      else if (node.hasAttribute('data-next-field')) nextField();
+      else if (node.hasAttribute('data-share-card')) shareCard(node.getAttribute('data-share-card'));
+      else if (node.hasAttribute('data-import-echo')) importEcho();
+      else if (node.hasAttribute('data-setting')) toggleSetting(node.getAttribute('data-setting'));
+      else if (node.hasAttribute('data-lang')) setLanguage(node.getAttribute('data-lang'));
+      else if (node.hasAttribute('data-menu-action')) menuAction(node.getAttribute('data-menu-action'));
+    });
+    document.addEventListener('keydown', function (event) { if (event.key === 'Escape' && currentSheet) closeSheet(); });
+    window.addEventListener('nebula:pause', function () { paused=true; audio('pause'); renderField(); }); window.addEventListener('nebula:resume', function () { paused=false; audio('resume'); renderField(); });
+    window.addEventListener('visibilitychange', function () { if (document.hidden) { paused=true; audio('pause'); } else { paused=false; audio('resume'); } renderField(); });
+    window.addEventListener('nebula:orientation', function () { renderField(); });
   }
 
   function demoState() {
-    var sample = emptyState(detectLang(), { music: false, effects: true, haptics: true, motion: true });
-    sample.dust = 30000000;
-    sample.total = 30000000;
-    sample.orbits = [25, 16, 10, 6, 3, 1];
-    sample.harms = [8, 5, 4, 3, 2];
-    sample.signals = [4, 3, 2, 2];
-    sample.remnants = 8;
-    sample.rem = { echo: 2, well: 2, span: 1, sight: 1 };
-    sample.gravity = 4;
-    sample.focus = 3;
-    sample.keys = 10;
-    sample.research = [2, 1, 1, 1, 0, 0];
-    sample.contracts = { day: dayKey(now()), claimed: true };
-    sample.daily = { clicks: 25, rifts: 1, dust: 600 };
-    sample.stats = { clicks: 250, rifts: 20, collapses: 3, expeditions: 4, lifeDust: 50000000 };
-    sample.discoveries = [1, 1, 1, 1, 1, 1];
-    sample.maxForm = FORMS.length - 1;
-    return sample;
-  }
-  function migrate(data) {
-    if (!data || typeof data !== 'object') return emptyState(detectLang());
-    var settings = data.settings || { effects: data.sound !== false, music: data.sound !== false, haptics: true, motion: true };
-    var fresh = emptyState(data.lang === 'en' || data.lang === 'ru' ? data.lang : detectLang(), settings);
-    fresh.dust = n(data.dust);
-    fresh.total = n(data.total);
-    fresh.orbits = arr(data.orbits, ORBITS.length);
-    fresh.harms = arr(data.harms, HARMONIES.length);
-    fresh.signals = arr(data.signals, SIGNALS.length);
-    fresh.remnants = int(data.remnants);
-    fresh.rem = {
-      echo: int(data.rem && data.rem.echo), well: int(data.rem && data.rem.well),
-      span: int(data.rem && data.rem.span), sight: int(data.rem && data.rem.sight)
-    };
-    fresh.gravity = int(data.gravity);
-    fresh.focus = int(data.focus);
-    fresh.keys = int(data.keys);
-    fresh.research = arr(data.research, RESEARCH.length);
-    fresh.maxForm = Math.min(FORMS.length - 1, int(data.maxForm));
-    fresh.discoveries = arr(data.discoveries, FORMS.length);
-    fresh.last = n(data.last, now());
-    fresh.welcome = !!data.welcome;
-    fresh.stats = {
-      clicks: int(data.stats && data.stats.clicks), rifts: int(data.stats && data.stats.rifts),
-      collapses: int(data.stats && data.stats.collapses), expeditions: int(data.stats && data.stats.expeditions),
-      lifeDust: n(data.stats && data.stats.lifeDust, n(data.total))
-    };
-    fresh.daily = {
-      clicks: int(data.daily && data.daily.clicks), rifts: int(data.daily && data.daily.rifts), dust: n(data.daily && data.daily.dust)
-    };
-    fresh.contracts = {
-      day: data.contracts && typeof data.contracts.day === 'string' ? data.contracts.day : dayKey(now()),
-      claimed: !!(data.contracts && data.contracts.claimed)
-    };
-    if (data.expedition && typeof data.expedition.id === 'string') {
-      var known = EXPEDITIONS.some(function (item) { return item.id === data.expedition.id; });
-      if (known) fresh.expedition = { id: data.expedition.id, ends: n(data.expedition.ends), started: n(data.expedition.started), claimed: false };
-    }
-    fresh.version = SAVE_VERSION;
-    return fresh;
-  }
-  function ensureDaily() {
-    var today = dayKey(now());
-    if (state.contracts.day !== today) {
-      state.contracts = { day: today, claimed: false };
-      state.daily = { clicks: 0, rifts: 0, dust: 0 };
-      return true;
-    }
-    return false;
+    var sample = freshState(detectLanguage(), {music:true,effects:true,haptics:true,motion:true}); sample.chapter=2; sample.insight=5; sample.lenses={echo:1,mirror:1,horizon:1,hush:0}; sample.stats={observations:9,links:25,constellations:9,shared:2,imported:1,witnessed:9};
+    sample.atlas = [
+      {id:'demo-1',seed:1425,chapter:1,signals:['pulse','whisper','beacon','ash'],links:[{a:'s0',b:'s1'},{a:'s1',b:'s2'},{a:'s2',b:'s3'}],family:'bridge',anomaly:'voice',decision:'preserve',title:'familyBridge',timestamp:now()-86400000},
+      {id:'demo-2',seed:8264,chapter:2,signals:['mirror','comet','whisper'],links:[{a:'s0',b:'s1'},{a:'s1',b:'s2'},{a:'s2',b:'s0'}],family:'loop',anomaly:'letter',decision:'release',title:'familyLoop',timestamp:now()-3600000}
+    ]; sample.currentField=createField(553189, sample.chapter, false, 'blind'); sample.currentField.listened=['s0','s1','s2']; sample.currentField.links=[{a:'s0',b:'s1'},{a:'s1',b:'s2'},{a:'s2',b:'s0'}]; return sample;
   }
 
-  function gravityMult() { return 1 + state.gravity * 0.5; }
-  function focusMult() { return 1 + state.focus * 0.02; }
-  function tidePhase(time) {
-    var part = ((time - tideAt) % 24000) / 24000;
-    if (part < 0.38) return 'high';
-    if (part < 0.72) return 'calm';
-    return 'ebb';
+  function start() {
+    if (demoMode) state = demoState(); else state = migrate(window.GPX && GPX.loadProgress ? GPX.loadProgress() : null);
+    applyStaticI18n(); audio('setSettings', state.settings); bindEvents(); renderAll(); el.fill.style.width='100%'; setTimeout(function () { el.boot.classList.add('hidden'); el.app.classList.remove('hidden'); }, 230); state.welcome = true; if (!demoMode) persist();
   }
-  function tideMult() {
-    var phase = tidePhase(Date.now());
-    var lens = 1 + 0.1 * state.signals[1];
-    if (phase === 'high') return 1.32 * lens;
-    if (phase === 'ebb') return 0.76;
-    return 1;
-  }
-  function chorusMult() {
-    var kinds = state.orbits.filter(function (level) { return level > 0; }).length;
-    return kinds <= 2 ? 1 : 1 + (kinds - 2) * 0.08;
-  }
-  function comboWindow() { return 520 + research(3) * 75; }
-  function comboMult() {
-    if (Date.now() > comboUntil) { combo = 0; return 1; }
-    return 1 + Math.min(combo, 16) * 0.08;
-  }
-  function clickPower() {
-    var power = 1;
-    HARMONIES.forEach(function (item, index) { if (item.kind === 'click') power += item.val * state.harms[index]; });
-    return power * gravityMult() * focusMult() * (1 + rem('echo') * 0.06) * (1 + research(2) * 0.08) * comboMult() * tideMult();
-  }
-  function flowMult() {
-    var multiplier = gravityMult() * focusMult() * (1 + rem('well') * 0.06) * (1 + research(0) * 0.04) * chorusMult() * tideMult();
-    HARMONIES.forEach(function (item, index) { if (item.kind === 'mult') multiplier *= 1 + item.val * state.harms[index]; });
-    return multiplier;
-  }
-  function perSec() {
-    var total = 0;
-    ORBITS.forEach(function (item, index) { total += item.prod * state.orbits[index]; });
-    return total * flowMult();
-  }
-  function critChance() {
-    var base = combo >= 5 ? 0.12 : 0;
-    return Math.min(0.55, base + state.signals[3] * 0.08);
-  }
-  function formIndex() {
-    var index = 0;
-    for (var i = 0; i < FORMS.length; i++) if (state.total >= FORMS[i].need) index = i;
-    return index;
-  }
-  function evoProgress() {
-    var index = formIndex();
-    if (index >= FORMS.length - 1) return 1;
-    return Math.max(0, Math.min(1, (state.total - FORMS[index].need) / (FORMS[index + 1].need - FORMS[index].need)));
-  }
-  function offlineCap() { return (8 + rem('span') * 2 + research(4)) * 3600; }
-  function collapseNeed() { return Math.floor(BASE_COLLAPSE_NEED * Math.pow(1.38, state.stats.collapses)); }
-  function collapseReward() {
-    var raw = 1 + Math.floor(formIndex() / 2) + Math.floor(state.stats.collapses / 3);
-    return Math.max(1, Math.floor(raw * (1 + research(5) * 0.05)));
-  }
-  function riftActive() { return Date.now() < riftUntil; }
-  function scheduleRift(from) {
-    var factor = Math.max(0.42, 1 - research(1) * 0.08);
-    var wait = Math.max(11000, (42000 - state.signals[2] * 5000) * factor);
-    nextRift = from + wait + Math.random() * 16000;
-  }
-
-  function checkDiscoveries() {
-    var index = formIndex();
-    if (index <= state.maxForm) return;
-    state.maxForm = index;
-    state.discoveries[index] = 1;
-    if (index > 0) {
-      state.keys += 1;
-      toast(t('discovery', { name: t('forms')[index] }) + ' · ' + t('keys') + ' +1');
-      audio('discovery');
-    }
-  }
-  function applyTheme() {
-    var index = formIndex();
-    document.documentElement.style.setProperty('--core', FORMS[index].color);
-    el.form.textContent = t('forms')[index];
-    checkDiscoveries();
-  }
-  function toast(text) {
-    el.toast.textContent = text;
-    el.toast.classList.remove('hidden');
-    clearTimeout(toast.timer);
-    toast.timer = setTimeout(function () { el.toast.classList.add('hidden'); }, 2600);
-  }
-  function floatText(value, kind) {
-    var node = document.createElement('div');
-    node.className = 'floater' + (kind === 'crit' ? ' crit' : '') + (kind === 'rift' ? ' rift' : '');
-    node.textContent = (kind === 'crit' ? t('crit') + ' ' : '') + '+' + fmt(value);
-    node.style.left = 40 + Math.random() * 20 + '%';
-    node.style.top = 48 + Math.random() * 8 + '%';
-    el.floats.appendChild(node);
-    setTimeout(function () { node.remove(); }, 820);
-  }
-  function addDust(value, display, kind, trackDaily) {
-    if (!isFinite(value) || value <= 0) return;
-    state.dust += value;
-    state.total += value;
-    state.stats.lifeDust += value;
-    if (trackDaily) state.daily.dust += value;
-    if (display) floatText(value, kind);
-  }
-
-  function harvest(fromAuto) {
-    if (paused) return;
-    var time = Date.now();
-    audio('unlock', state.settings);
-    if (!fromAuto) {
-      combo = time < comboUntil ? combo + 1 : 1;
-      comboUntil = time + comboWindow();
-      state.stats.clicks += 1;
-      state.daily.clicks += 1;
-    }
-    var value = clickPower();
-    var critical = Math.random() < critChance();
-    if (critical) value *= 3;
-    if (riftActive()) {
-      if (time < riftChainUntil) riftChain += 1;
-      else riftChain = 1;
-      riftChainUntil = time + 75000;
-      var chainMult = 1 + Math.min(4, riftChain - 1) * 0.25;
-      var bonus = Math.max(value * 8, perSec() * 12) * (1 + rem('sight') * 0.25) * chainMult;
-      addDust(bonus, true, 'rift', true);
-      riftUntil = 0;
-      state.stats.rifts += 1;
-      state.daily.rifts += 1;
-      scheduleRift(time);
-      toast(t('riftHit', { n: fmt(bonus) }) + (riftChain > 1 ? ' · ' + t('riftChain', { n: riftChain }) : ''));
-      audio('rift');
-      haptic([14, 20, 20]);
-    } else {
-      addDust(value, !fromAuto, critical ? 'crit' : '', !fromAuto);
-      if (!fromAuto) {
-        audio('tap', critical ? 'crit' : 'tap');
-        haptic(critical ? [8, 22, 12] : 7);
-      }
-    }
-    renderHud(true);
-  }
-
-  function scoreValue() {
-    return Math.floor(Math.log10(state.stats.lifeDust + 1) * 1000 + state.gravity * 250 + state.remnants * 80 + state.keys * 90);
-  }
-  function serializableState() {
-    state.version = SAVE_VERSION;
-    state.last = now();
-    return state;
-  }
-  function persist() {
-    if (demoMode) return;
-    serializableState();
-    if (typeof GPX !== 'undefined') GPX.saveProgress(state, scoreValue());
-  }
-  function hydrate(data) {
-    state = migrate(data);
-    var changedDay = ensureDaily();
-    var elapsed = Math.min(offlineCap(), Math.max(0, (now() - state.last) / 1000));
-    var gained = perSec() * elapsed;
-    if (gained > 1) addDust(gained, false, '', false);
-    if (changedDay) persist();
-    return gained;
-  }
-
-  function missionList() {
-    return [
-      { id: 'clicks', key: 'missionClicks', desc: 'missionClicksD', need: 25, now: state.daily.clicks },
-      { id: 'rifts', key: 'missionRifts', desc: 'missionRiftsD', need: 1, now: state.daily.rifts },
-      { id: 'dust', key: 'missionDust', desc: 'missionDustD', need: 250, now: state.daily.dust }
-    ];
-  }
-  function contractsComplete() { return missionList().every(function (mission) { return mission.now >= mission.need; }); }
-  function activitySummary() {
-    var missions = missionList();
-    var completed = missions.filter(function (mission) { return mission.now >= mission.need; }).length;
-    if (contractsComplete() && !state.contracts.claimed) return { kicker: t('contracts'), title: t('missionClaim'), meta: t('ready'), progress: 1 };
-    if (!state.contracts.claimed) {
-      var next = missions.find(function (mission) { return mission.now < mission.need; }) || missions[0];
-      return { kicker: t('contracts'), title: t(next.key), meta: Math.min(next.now, next.need) + ' / ' + next.need, progress: Math.min(1, next.now / next.need) };
-    }
-    var expedition = expeditionInfo();
-    if (expedition) {
-      if (expedition.ready) return { kicker: t('expeditions'), title: t('expeditionClaim'), meta: t('ready'), progress: 1 };
-      return { kicker: t('expeditions'), title: t('exp' + capitalize(expedition.id)), meta: fmtTime((expedition.ends - now()) / 1000), progress: expedition.progress };
-    }
-    return { kicker: t('expeditions'), title: t('expeditionNo'), meta: t('contractsProgress', { n: completed, all: missions.length }), progress: completed / missions.length };
-  }
-  function renderActivity() {
-    var summary = activitySummary();
-    el.activityKicker.textContent = summary.kicker;
-    el.activityTitle.textContent = summary.title;
-    el.activityMeta.textContent = summary.meta;
-    el.activityFill.style.width = Math.round(summary.progress * 100) + '%';
-  }
-  function renderHud(force) {
-    var time = Date.now();
-    if (!force && time - lastHud < 120) return;
-    lastHud = time;
-    ensureDaily();
-    el.dust.textContent = fmt(state.dust);
-    el.rate.textContent = fmt(perSec()) + ' ' + t('perSec');
-    var progress = evoProgress();
-    el.evo.textContent = formIndex() >= FORMS.length - 1 ? t('formCap') : t('phase') + ' ' + Math.floor(progress * 100) + '%';
-    el.evoFill.style.width = (progress * 100) + '%';
-    var phase = tidePhase(time);
-    var multiplier = tideMult();
-    el.tide.className = 'chip ' + phase + (riftActive() ? ' rift' : '');
-    if (riftActive()) el.tide.textContent = t('riftOpen');
-    else if (phase === 'high') el.tide.textContent = t('tideHigh', { n: multiplier.toFixed(2) });
-    else if (phase === 'ebb') el.tide.textContent = t('tideEbb', { n: multiplier.toFixed(2) });
-    else el.tide.textContent = chorusMult() > 1 ? t('chorus', { n: chorusMult().toFixed(2) }) : t('tideCalm');
-    if (time < comboUntil && combo > 1) {
-      el.combo.classList.remove('hidden');
-      el.combo.textContent = t('resonance') + ' ×' + comboMult().toFixed(2);
-    } else el.combo.classList.add('hidden');
-    el.core.classList.toggle('rift', riftActive());
-    el.reward.disabled = rewardBusy;
-    renderActivity();
-    applyTheme();
-  }
-
-  function setSheetContent(html) { el.sheetBody.innerHTML = html; }
-  function openSheet(kind, title, html) {
-    previousFocus = document.activeElement;
-    sheetKind = kind;
-    el.sheetTitle.textContent = title;
-    setSheetContent(html);
-    el.sheet.classList.remove('hidden');
-    el.sheet.setAttribute('aria-hidden', 'false');
-    requestAnimationFrame(function () { el.sheetCard.focus(); });
-  }
-  function closeSheet() {
-    sheetKind = '';
-    el.sheet.classList.add('hidden');
-    el.sheet.setAttribute('aria-hidden', 'true');
-    if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
-    previousFocus = null;
-  }
-  function refreshOpenSheet() {
-    if (el.sheet.classList.contains('hidden')) return;
-    if (sheetKind === 'shop') { el.sheetTitle.textContent = t('workshop'); setSheetContent(shopHtml()); }
-    else if (sheetKind === 'collapse') { el.sheetTitle.textContent = t('collapse'); setSheetContent(collapseHtml()); }
-    else if (sheetKind === 'objectives') { el.sheetTitle.textContent = t('contracts'); setSheetContent(objectivesHtml()); }
-    else if (sheetKind === 'menu') { el.sheetTitle.textContent = t('menu'); setSheetContent(menuHtml()); }
-    else if (sheetKind === 'settings') { el.sheetTitle.textContent = t('settings'); setSheetContent(settingsHtml()); }
-    else if (sheetKind === 'about') { el.sheetTitle.textContent = t('about'); setSheetContent(aboutHtml()); }
-  }
-  function itemHtml(title, desc, cost, attr, extra) {
-    var can = state.dust >= cost;
-    return '<div class="shop-item"><div><h3>' + title + '</h3><p>' + desc + '</p>' + (extra || '') + '</div><button ' + attr + ' class="' + (can ? 'ok' : '') + '"' + (can ? '' : ' aria-disabled="true"') + '>' + fmt(cost) + '</button></div>';
-  }
-  function shopHtml() {
-    var tabs = '<div class="tabs" style="--tabs:4">' +
-      tab('orbits', t('orbits')) + tab('harm', t('harmonies')) + tab('sig', t('signals')) + tab('research', t('research')) + '</div>';
-    var list = '';
-    if (shopTab === 'orbits') {
-      ORBITS.forEach(function (item, index) {
-        var cost = costOf(item.base, state.orbits[index]);
-        list += itemHtml(t('orbitNames')[index] + ' · ' + state.orbits[index], t('orbitDesc')[index], cost, 'data-buy-orbit="' + index + '"', '<span class="item-stat">+' + fmt(item.prod * flowMult()) + ' ' + t('perSec') + '</span>');
-      });
-    } else if (shopTab === 'harm') {
-      HARMONIES.forEach(function (item, index) {
-        var cost = costOf(item.base, state.harms[index]);
-        list += itemHtml(t('harmNames')[index] + ' · ' + state.harms[index], t('harmDesc')[index], cost, 'data-buy-harm="' + index + '"');
-      });
-    } else if (shopTab === 'sig') {
-      SIGNALS.forEach(function (item, index) {
-        var cost = costOf(item.base, state.signals[index]);
-        list += itemHtml(t('sig' + item.key) + ' · ' + state.signals[index], t('sig' + item.key + 'D'), cost, 'data-buy-sig="' + index + '"');
-      });
-    } else list = researchHtml();
-    return tabs + list;
-  }
-  function tab(id, label) { return '<button data-tab="' + id + '" class="' + (shopTab === id ? 'on' : '') + '">' + label + '</button>'; }
-  function researchHtml() {
-    var html = '<p class="section-lead">' + t('researchLead') + '</p><p class="note"><strong>' + t('keys') + ':</strong> ' + state.keys + '</p><div class="research-grid">';
-    RESEARCH.forEach(function (item, index) {
-      var level = research(index);
-      var cost = item.base + Math.floor(level / 2);
-      var can = state.keys >= cost;
-      var maxed = level >= 8;
-      html += '<button class="research-node ' + (maxed ? 'maxed' : can ? 'available' : 'locked') + '" data-buy-research="' + index + '"' + (maxed ? ' disabled' : '') + '><h3>' + t('researchNames')[index] + ' · ' + t('level') + ' ' + level + '</h3><p>' + t('researchDesc')[index] + '</p><span class="node-cost">' + (maxed ? t('maxed') : cost + ' ' + t('keys')) + '</span></button>';
-    });
-    return html + '</div>';
-  }
-  function remnantHtml() {
-    var html = '<p class="section-title">' + t('remnants') + '</p><p class="note">' + t('remnantsHave', { n: state.remnants }) + '. ' + t('remnantsHint') + '</p>';
-    REMS.forEach(function (item) {
-      var level = rem(item.id);
-      var can = state.remnants > 0;
-      html += '<div class="shop-item"><div><h3>' + t(item.name) + ' · ' + level + '</h3><p>' + t(item.desc) + '</p></div><button data-buy-rem="' + item.id + '" class="' + (can ? 'ok' : '') + '">' + (can ? t('remnantBuy') : t('remnantNeed')) + '</button></div>';
-    });
-    return html;
-  }
-  function collapseHtml() {
-    var need = collapseNeed();
-    var ready = state.total >= need;
-    return '<p class="section-lead">' + t('collapseNote') + '</p>' +
-      '<div class="collapse-summary"><div><span>' + t('gravityNow') + '</span><strong>×' + gravityMult().toFixed(2) + '</strong></div><div><span>' + t('gravityAfter') + '</span><strong>×' + (gravityMult() + .5).toFixed(2) + '</strong></div><div><span>' + t('collapseReward') + '</span><strong>+' + collapseReward() + '</strong></div><div><span>' + t('collapseCount') + '</span><strong>' + state.stats.collapses + '</strong></div></div>' +
-      '<p class="note">' + t('collapseNeed', { need: fmt(need), now: fmt(state.total) }) + '</p>' +
-      (ready ? '<button class="menu-item" data-do-collapse="1">' + t('doCollapse') + ' (+0.5×)</button>' : '<p class="warn">' + t('tooLight') + '</p>') + remnantHtml();
-  }
-  function expeditionInfo() {
-    if (!state.expedition) return null;
-    var info = EXPEDITIONS.find(function (item) { return item.id === state.expedition.id; });
-    if (!info) return null;
-    var left = state.expedition.ends - now();
-    return { id: info.id, info: info, ends: state.expedition.ends, ready: left <= 0, progress: Math.max(0, Math.min(1, 1 - left / (info.mins * 60000))) };
-  }
-  function missionHtml(mission) {
-    var done = mission.now >= mission.need;
-    var amount = Math.min(mission.now, mission.need);
-    return '<div class="mission-row ' + (done ? 'done' : '') + '"><div class="progress-row"><div><h3>' + t(mission.key) + '</h3><p>' + t(mission.desc, { need: mission.need }) + '</p></div><strong>' + amount + ' / ' + mission.need + '</strong><div class="thin-progress"><b style="width:' + Math.round(Math.min(1, mission.now / mission.need) * 100) + '%"></b></div></div></div>';
-  }
-  function objectivesHtml() {
-    var missions = missionList();
-    var html = '<p class="section-lead">' + t('contractsLead') + '</p>';
-    missions.forEach(function (mission) { html += missionHtml(mission); });
-    if (contractsComplete() && !state.contracts.claimed) html += '<button class="claim-button ok" data-claim-contract="1">' + t('missionClaim') + ' · ' + t('keys') + ' +1</button>';
-    else if (state.contracts.claimed) html += '<p class="good">' + t('contractsDone', { n: 1 }) + '</p>';
-    html += '<p class="section-title">' + t('expeditions') + '</p><p class="section-lead">' + t('expeditionsLead') + '</p>';
-    var active = expeditionInfo();
-    if (active) {
-      html += '<div class="expedition-card ' + (active.ready ? 'ready' : 'active') + '"><h3>' + t('exp' + capitalize(active.id)) + '</h3><p>' + t('exp' + capitalize(active.id) + 'D') + '</p><div class="thin-progress"><b style="width:' + Math.round(active.progress * 100) + '%"></b></div><p class="' + (active.ready ? 'good' : 'note') + '">' + (active.ready ? t('expeditionReady') : t('expeditionActive', { time: fmtTime((active.ends - now()) / 1000) })) + '</p>' + (active.ready ? '<button class="claim-button ok" data-claim-expedition="1">' + t('expeditionClaim') + '</button>' : '') + '</div>';
-    } else {
-      EXPEDITIONS.forEach(function (item) {
-        var reward = item.reward === 'dust' ? t('expRewardDust', { n: fmt(Math.max(500, perSec() * 240)) }) : item.reward === 'key' ? t('expRewardKey', { n: 1 }) : t('expRewardFocus');
-        html += '<div class="expedition-card"><h3>' + t('exp' + capitalize(item.id)) + '</h3><p>' + t('exp' + capitalize(item.id) + 'D') + '</p><span class="reward-pill">' + reward + ' · ' + item.mins + ' мин</span><button data-start-expedition="' + item.id + '">' + t('expeditionStart') + '</button></div>';
-      });
-    }
-    return html;
-  }
-  function menuHtml() {
-    return '<button class="menu-item" data-act="objectives">' + t('contracts') + ' · ' + t('expeditions') + '</button>' +
-      '<button class="menu-item" data-act="settings">' + t('settings') + '</button>' +
-      '<button class="menu-item" data-act="board">' + t('board') + '</button>' +
-      '<button class="menu-item" data-act="invite">' + t('invite') + '</button>' +
-      '<button class="menu-item" data-act="fav">' + t('fav') + '</button>' +
-      '<button class="menu-item" data-act="about">' + t('about') + '</button>' +
-      '<button class="menu-item" data-act="privacy">' + t('privacy') + '</button>' +
-      '<button class="menu-item danger" data-act="reset">' + t('reset') + '</button>';
-  }
-  function settingRow(label, description, value, action) {
-    var stateLabel = value ? t('on') : t('off');
-    return '<div class="set-row"><div class="setting-copy"><strong>' + label + '</strong><span>' + description + '</span></div>' +
-      '<button type="button" class="setting-switch ' + (value ? 'is-on' : 'is-off') + '" data-act="' + action + '" role="switch" aria-checked="' + value + '" aria-label="' + label + ': ' + stateLabel + '">' +
-      '<span class="switch-state">' + stateLabel + '</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span></button></div>';
-  }
-  function languageOption(code, short, name) {
-    var active = state.lang === code;
-    return '<button type="button" class="language-option ' + (active ? 'is-active' : '') + '" data-lang="' + code + '" aria-pressed="' + active + '" aria-label="' + t('languageSelect', { name: name }) + '">' +
-      '<span class="language-code">' + short + '</span><span class="language-name">' + name + '</span><span class="language-check" aria-hidden="true">✓</span></button>';
-  }
-  function settingsHtml() {
-    return '<div class="settings-intro"><span>' + t('settingsKicker') + '</span><p>' + t('settingsLead') + '</p></div>' +
-      '<section class="language-row" aria-labelledby="languageTitle"><div class="language-heading"><span>' + t('languageKicker') + '</span><strong id="languageTitle">' + t('language') + '</strong><p>' + t('languageLead') + '</p></div>' +
-      '<div class="lang-switch" role="group" aria-label="' + t('language') + '">' + languageOption('ru', 'RU', t('langRu')) + languageOption('en', 'EN', t('langEn')) + '</div></section>' +
-      '<div class="settings-section-label">' + t('audioAndComfort') + '</div>' +
-      settingRow(t('music'), t('musicLead'), state.settings.music, 'toggle-music') +
-      settingRow(t('effects'), t('effectsLead'), state.settings.effects, 'toggle-effects') +
-      settingRow(t('haptics'), t('hapticsLead'), state.settings.haptics, 'toggle-haptics') +
-      settingRow(t('motion'), t('motionLead'), state.settings.motion, 'toggle-motion') +
-      '<button class="menu-item settings-back" data-act="menu">' + t('back') + '</button>';
-  }
-  function aboutHtml() {
-    return '<div class="about-card"><p class="note"><strong>' + t('title') + '</strong> — ' + t('about1') + '</p><p class="note">' + t('about2') + '</p><p class="note">' + t('about3') + '</p></div><button class="menu-item" data-act="menu">' + t('back') + '</button>';
-  }
-  function capitalize(value) { return value ? value.charAt(0).toUpperCase() + value.slice(1) : ''; }
-
-  function buy(array, config, index) {
-    var cost = costOf(config[index].base, array[index]);
-    if (state.dust < cost) { haptic(10); return false; }
-    state.dust -= cost;
-    array[index] += 1;
-    audio('purchase');
-    haptic([7, 16, 7]);
-    persist();
-    renderHud(true);
-    refreshOpenSheet();
-    return true;
-  }
-  function buyResearch(index) {
-    var level = research(index);
-    if (level >= 8) return;
-    var cost = RESEARCH[index].base + Math.floor(level / 2);
-    if (state.keys < cost) { haptic(10); return; }
-    state.keys -= cost;
-    state.research[index] += 1;
-    audio('research');
-    haptic([8, 20, 10]);
-    persist();
-    renderHud(true);
-    refreshOpenSheet();
-  }
-  function buyRemnant(id) {
-    if (state.remnants < 1) { haptic(10); return; }
-    state.remnants -= 1;
-    state.rem[id] = rem(id) + 1;
-    audio('purchase');
-    persist();
-    renderHud(true);
-    refreshOpenSheet();
-  }
-  function claimContracts() {
-    if (!contractsComplete() || state.contracts.claimed) return;
-    state.contracts.claimed = true;
-    state.keys += 1;
-    toast(t('contractsDone', { n: 1 }));
-    audio('discovery');
-    haptic([12, 24, 12]);
-    persist();
-    renderHud(true);
-    refreshOpenSheet();
-  }
-  function startExpedition(id) {
-    if (state.expedition) return;
-    var item = EXPEDITIONS.find(function (row) { return row.id === id; });
-    if (!item) return;
-    state.expedition = { id: item.id, started: now(), ends: now() + item.mins * 60000, claimed: false };
-    toast(t('expeditionStart') + ': ' + t('exp' + capitalize(item.id)));
-    audio('purchase');
-    persist();
-    renderHud(true);
-    refreshOpenSheet();
-  }
-  function claimExpedition() {
-    var active = expeditionInfo();
-    if (!active || !active.ready) return;
-    var reward;
-    if (active.info.reward === 'dust') {
-      var dust = Math.max(500, perSec() * 240 + clickPower() * 80) * gravityMult();
-      addDust(dust, true, '', true);
-      reward = t('expRewardDust', { n: fmt(dust) });
-    } else if (active.info.reward === 'key') {
-      state.keys += 1;
-      reward = t('expRewardKey', { n: 1 });
-    } else {
-      state.focus += 1;
-      reward = t('expRewardFocus');
-    }
-    state.stats.expeditions += 1;
-    var label = t('exp' + capitalize(active.id));
-    state.expedition = null;
-    toast(t('expeditionReturned', { name: label, reward: reward }));
-    audio('discovery');
-    haptic([12, 28, 12]);
-    persist();
-    renderHud(true);
-    refreshOpenSheet();
-  }
-  function doCollapse() {
-    if (state.total < collapseNeed()) return;
-    var gain = collapseReward();
-    state.gravity += 1;
-    state.remnants += gain;
-    state.stats.collapses += 1;
-    state.dust = 0;
-    state.total = 0;
-    state.orbits = arr(null, ORBITS.length);
-    state.harms = arr(null, HARMONIES.length);
-    state.signals = arr(null, SIGNALS.length);
-    combo = 0;
-    riftUntil = 0;
-    riftChain = 0;
-    scheduleRift(Date.now());
-    persist();
-    closeSheet();
-    toast(t('collapsed', { n: gravityMult().toFixed(2), r: gain }));
-    audio('collapse');
-    haptic([20, 40, 32]);
-    renderHud(true);
-    setTimeout(function () { if (typeof GPX !== 'undefined') GPX.showFullscreen(); }, 550);
-  }
-  function hardReset() {
-    if (!confirm(t('resetAsk'))) return;
-    var lang = state.lang;
-    var settings = state.settings;
-    state = emptyState(lang, settings);
-    state.welcome = true;
-    scheduleRift(Date.now());
-    persist();
-    closeSheet();
-    renderHud(true);
-  }
-
-  function handleAction(action) {
-    switch (action) {
-      case 'objectives': openSheet('objectives', t('contracts'), objectivesHtml()); break;
-      case 'settings': openSheet('settings', t('settings'), settingsHtml()); break;
-      case 'toggle-music': state.settings.music = !state.settings.music; audio('setSettings', state.settings); persist(); refreshOpenSheet(); break;
-      case 'toggle-effects': state.settings.effects = !state.settings.effects; audio('setSettings', state.settings); persist(); refreshOpenSheet(); break;
-      case 'toggle-haptics': state.settings.haptics = !state.settings.haptics; persist(); refreshOpenSheet(); break;
-      case 'toggle-motion': state.settings.motion = !state.settings.motion; document.body.classList.toggle('motion-off', !state.settings.motion); persist(); refreshOpenSheet(); break;
-      case 'board': if (!GPX.openLeaderboard()) toast(t('noBoard')); break;
-      case 'invite': if (!GPX.invite(t('share'))) toast(t('noInvite')); break;
-      case 'fav': if (!GPX.addFavorite()) toast(t('noFav')); break;
-      case 'about': openSheet('about', t('about'), aboutHtml()); break;
-      case 'privacy': if (!GPX.openPrivacy()) toast(t('noPrivacy')); break;
-      case 'reset': hardReset(); break;
-      case 'menu': openSheet('menu', t('menu'), menuHtml()); break;
-    }
-  }
-
-  el.core.addEventListener('pointerdown', function (event) { event.preventDefault(); harvest(false); });
-  el.objectives.addEventListener('click', function () { openSheet('objectives', t('contracts'), objectivesHtml()); });
-  el.shop.addEventListener('click', function () { shopTab = 'orbits'; openSheet('shop', t('workshop'), shopHtml()); });
-  el.collapse.addEventListener('click', function () { openSheet('collapse', t('collapse'), collapseHtml()); });
-  el.reward.addEventListener('click', async function () {
-    if (rewardBusy) return;
-    rewardBusy = true;
-    renderHud(true);
-    var success = await GPX.showRewarded();
-    rewardBusy = false;
-    if (success) {
-      var gift = Math.max(25, perSec() * 90 + clickPower() * 40) * tideMult();
-      addDust(gift, true, '', true);
-      persist();
-      renderHud(true);
-      toast(t('rewardOk', { n: fmt(gift) }));
-      audio('reward');
-      haptic([9, 19, 9]);
-    } else {
-      toast(GPX.has() ? t('rewardFail') : t('rewardNoSdk'));
-      renderHud(true);
-    }
-  });
-  el.menu.addEventListener('click', function () { openSheet('menu', t('menu'), menuHtml()); });
-  el.sheetClose.addEventListener('click', closeSheet);
-  el.sheet.addEventListener('click', function (event) { if (event.target === el.sheet) closeSheet(); });
-  document.addEventListener('keydown', function (event) { if (event.key === 'Escape' && !el.sheet.classList.contains('hidden')) closeSheet(); });
-
-  el.sheetBody.addEventListener('click', function (event) {
-    var button = event.target instanceof HTMLElement ? event.target.closest('[data-tab],[data-buy-orbit],[data-buy-harm],[data-buy-sig],[data-buy-rem],[data-buy-research],[data-do-collapse],[data-act],[data-lang],[data-claim-contract],[data-start-expedition],[data-claim-expedition]') : null;
-    if (!button) return;
-    if (button.dataset.tab) { shopTab = button.dataset.tab; refreshOpenSheet(); return; }
-    if (button.dataset.lang) { setLang(button.dataset.lang); return; }
-    if (button.dataset.buyOrbit != null) { buy(state.orbits, ORBITS, +button.dataset.buyOrbit); return; }
-    if (button.dataset.buyHarm != null) { buy(state.harms, HARMONIES, +button.dataset.buyHarm); return; }
-    if (button.dataset.buySig != null) { buy(state.signals, SIGNALS, +button.dataset.buySig); return; }
-    if (button.dataset.buyRem) { buyRemnant(button.dataset.buyRem); return; }
-    if (button.dataset.buyResearch != null) { buyResearch(+button.dataset.buyResearch); return; }
-    if (button.dataset.claimContract) { claimContracts(); return; }
-    if (button.dataset.startExpedition) { startExpedition(button.dataset.startExpedition); return; }
-    if (button.dataset.claimExpedition) { claimExpedition(); return; }
-    if (button.dataset.doCollapse) { doCollapse(); return; }
-    if (button.dataset.act) handleAction(button.dataset.act);
-  });
-
-  function setPaused(value) {
-    paused = value;
-    if (value) audio('pause');
-    else { lastTick = Date.now(); audio('resume'); }
-  }
-  window.addEventListener('nebula:pause', function () { setPaused(true); });
-  window.addEventListener('nebula:resume', function () { setPaused(false); });
-  window.addEventListener('nebula:orientation', function () { renderHud(true); });
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { persist(); setPaused(true); }
-    else setPaused(false);
-  });
-
-  function tick() {
-    var time = Date.now();
-    var delta = Math.min(1, Math.max(0, (time - lastTick) / 1000));
-    lastTick = time;
-    if (!paused) {
-      addDust(perSec() * delta, false, '', false);
-      if (!riftActive() && riftUntil > 0) {
-        riftUntil = 0;
-        scheduleRift(time);
-      }
-      if (time >= nextRift && !riftActive() && riftUntil === 0) {
-        riftUntil = time + 7000 + state.signals[2] * 1200;
-        toast(t('riftOpen'));
-        audio('riftOpen');
-      }
-      if (state.signals[0] > 0 && time - metroAt > Math.max(700, 1600 - state.signals[0] * 80)) {
-        metroAt = time;
-        harvest(true);
-      }
-    }
-    if (time > comboUntil) combo = 0;
-    if (time > riftChainUntil) riftChain = 0;
-    renderHud(false);
-    if (!el.sheet.classList.contains('hidden') && time - lastSheetRefresh > 900) {
-      lastSheetRefresh = time;
-      if (sheetKind === 'objectives' || sheetKind === 'collapse') refreshOpenSheet();
-    }
-    if (time - saveTimer > 15000) { saveTimer = time; persist(); }
-    requestAnimationFrame(tick);
-  }
-  function bootAnim(done) {
-    var progress = 8;
-    var timer = setInterval(function () {
-      progress += 10 + Math.random() * 16;
-      if (progress >= 100) { progress = 100; clearInterval(timer); done(); }
-      el.fill.style.width = progress + '%';
-    }, 130);
-  }
-
-  state.lang = detectLang();
-  applyStaticI18n();
-  scheduleRift(Date.now());
-  bootAnim(function () {
-    GPX.whenReady(function () {
-      var explicitLang = savedLang();
-      var platformLang = GPX.platformLang();
-      var offline = hydrate(demoMode ? demoState() : GPX.loadProgress());
-      if (explicitLang) state.lang = explicitLang;
-      else if (validLang(platformLang)) state.lang = platformLang;
-      else if (!validLang(state.lang)) state.lang = detectLang();
-      ensureDaily();
-      applyStaticI18n();
-      document.body.classList.toggle('motion-off', !state.settings.motion);
-      audio('setSettings', state.settings);
-      el.boot.classList.add('hidden');
-      el.app.classList.remove('hidden');
-      renderHud(true);
-      if (demoSettingsMode) openSheet('settings', t('settings'), settingsHtml());
-      if (offline > 1) toast(t('offline', { n: fmt(offline) }));
-      persist();
-      lastTick = Date.now();
-      tick();
-    });
-  });
+  el.fill.style.width='28%';
+  if (window.GP_PROJECT_ID && window.GP_PROJECT_ID !== 'YOUR_PROJECT_ID' && window.GPX && GPX.whenReady) GPX.whenReady(start); else setTimeout(start, 90);
 })();

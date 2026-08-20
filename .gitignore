@@ -2,3 +2,7 @@
 node_modules/
 .idea/
 *.log
+.dev-server.mjs
+/screenshots/
+/settings-qa-screens/
+/settings-language-qa.md

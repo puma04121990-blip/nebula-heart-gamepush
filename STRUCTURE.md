@@ -1,39 +1,129 @@
-# Architecture: Сердце Туманности 2.0
+# Architecture: «Атлас Эха»
 
-## Operating model
+## Scope
 
-The game remains a dependency-free HTML5 application suitable for GamePush ZIP hosting. It intentionally preserves `index.html`, `css/style.css`, `js/gp-bridge.js`, `js/i18n.js` and `js/game.js` as the deployment surface, while the game script becomes a small collection of explicit services rather than a single uncontrolled frame loop.
+The project stays a dependency-free HTML5 GamePush application. It remains portable as a ZIP with `index.html` in the archive root, functions without platform credentials in local mode, and keeps GamePush as the cloud-save, pause, audio, social-overlay and advertising adapter. The old economy loop is intentionally removed: the browser is now a small interactive observatory, not a passive production dashboard.
 
-| Layer | Responsibility | Main elements |
+| Surface | Responsibility |
+| --- | --- |
+| `index.html` | Semantic shell for the observatory, field controls, Atlas dock, sheet dialog, toasts and boot. |
+| `css/style.css` | Responsive observatory layout, field-journal identity, signal silhouettes, SVG-line presentation, portrait and landscape rules, reduced-motion fallback. |
+| `js/i18n.js` | Equal RU/EN content: narrative fragments, signal names, interface, accessibility strings and share text. |
+| `js/gp-bridge.js` | Existing GamePush lifecycle, local/cloud persistence, ads, leaderboards and native sharing fallback. |
+| `js/audio-engine.js` | Gesture-gated soundscape plus semantic signal, thread and choice feedback. |
+| `js/game.js` | State migration, deterministic sky generation, observation state machine, Atlas, challenges, sharing and rendering. |
+
+## Explicit game state machine
+
+Gameplay is driven by named modes rather than anonymous click handlers.
+
+```text
+BOOT → FIELD_READY → LISTENING → FIELD_READY
+                         ↓
+                   LINK_SOURCE → LINK_TARGET → FIELD_READY
+                         ↓
+                    ANOMALY_CHOICE → RESOLUTION → ATLAS_CARD
+                                                       ↓
+                                                  FIELD_READY
+```
+
+| Mode | Permitted player action | Visible feedback | Exit condition |
+| --- | --- | --- | --- |
+| `FIELD_READY` | Select one signal, open Atlas or open menu. | Unresolved signals breathe; guidance names the next meaningful action. | Select a signal or complete conditions for anomaly. |
+| `LISTENING` | Hold/tap the selected signal. | Its hidden trait, tone and compatible behaviour become visible. | Listen is confirmed once per signal. |
+| `LINK_SOURCE` | Select a second compatible signal. | First source is outlined; compatible targets are bright. | A legal pair is chosen or the action is cancelled. |
+| `LINK_TARGET` | Confirm the proposed thread. | SVG thread draws from source to target; constellation family is recalculated. | Link completes. |
+| `ANOMALY_CHOICE` | Witness, preserve or release the revealed anomaly. | Central seal expands; two equal, readable decisions explain different outcomes. | A decision creates the Nебесная запись. |
+| `RESOLUTION` | Review, share or archive the record. | Constellation locks, name appears, rewards are explained as discoveries—not currency. | Archive / share / start next field. |
+
+## State schema and migration
+
+`SAVE_VERSION` becomes `3`. Migration remains additive and never deletes an old save merely because it lacks Atlas fields. Legacy idle values are retained as `legacyDust` for transparent acknowledgement but do not grant a competitive power advantage; the first migration creates one archival card, **«Первый отклик»**, based on the old lifetime value. Existing language and accessibility settings remain intact.
+
+```js
+{
+  version: 3,
+  lang: 'ru' | 'en',
+  settings: { music, effects, haptics, motion },
+  legacyDust: number,
+  chapter: 0,
+  chapterProgress: { resolved: number, witnesses: number },
+  lenses: { echo: 0, mirror: 0, horizon: 0, hush: 0 },
+  insight: number,
+  currentField: {
+    id: string,
+    seed: number,
+    chapter: number,
+    signals: Signal[],
+    links: Link[],
+    listened: string[],
+    anomaly: Anomaly | null,
+    status: 'ready' | 'resolved',
+    createdAt: number
+  },
+  atlas: AtlasCard[],
+  anomalyMemory: { [anomalyId]: { seen: number, preserved: number, released: number } },
+  encounters: Encounter[],
+  stats: { observations, links, constellations, shared, imported, witnessed },
+  lastFieldAt: number,
+  welcome: boolean
+}
+```
+
+State arrays are normalised and capped for cloud-save safety: `atlas` retains the newest 48 cards, `encounters` retains the newest 12. Every visible card stores generated data and localisation keys rather than rendered HTML. The save is queued through `GPX.saveProgress` after a completed observation, lens unlock, imported challenge or changed preference; it is never synced on every pointer move.
+
+## Deterministic sky generation
+
+A compact seeded pseudo-random generator builds each field. Its seed derives from `chapter`, a day-safe index, the observation count and—in imported challenges—the decoded public code. Given the same seed and chapter, two devices render the same set of signal types, positions, anomaly and permitted link pairs. No account identifier or personal information enters the seed.
+
+| Generator stage | Data | Purpose |
 | --- | --- | --- |
-| Presentation | Static page structure, safe touch targets, dialog focus and responsive layout. | `index.html`, `style.css` |
-| Localisation | All player-visible strings, titles, descriptions and accessibility labels in Russian and English. | `i18n.js` |
-| Platform | GamePush initialisation, cloud/local persistence, pause/resume, ads, leaderboards, social overlays, device hints. | `gp-bridge.js` |
-| Game rules | State migration, economy formulas, contracts, expeditions, research, event scheduling, collapse and offline income. | `game.js` |
-| Audio and feedback | Synthesised ambient sequence, interaction effects, haptics and audio lifecycle. | `audio-engine.js` |
+| 1. Sky family | Chapter + seed | Changes palette, background pattern and available signal behaviours. |
+| 2. Signal selection | Weighted deterministic picks | Produces five to seven signals with no impossible intro combination. |
+| 3. Positions | Bounded polar coordinates | Keeps entities away from HUD, each other, safe areas and the central anomaly. |
+| 4. Anomaly test | Observation count + seed | Creates a rare encounter only after enough meaningful links. |
+| 5. Prompt | Signal/anomaly traits | Creates the short narrative guidance and outcome flavour. |
 
-## State model
+## Data-driven content
 
-A serialised state carries a small numeric `version`, the established economy fields, preference fields, and new content state. Arrays remain indexed by static configuration; migrations always normalize their length. Timed content is represented as timestamps and day keys rather than running timers, which makes it reliable after a tab is closed.
+Signals, anomaly types, chapters, constellation families and lenses live as static configuration records in `game.js`. This makes later content additions possible without rewriting renderer logic.
 
-| New state field | Purpose | Persistence rule |
-| --- | --- | --- |
-| `version` | Enables safe migration from the original unversioned save. | Always write the latest number. |
-| `contracts` | Daily mission key plus completion and claim flags. | Rebuild only when the day key changes. |
-| `keys` | Currency earned through contracts and discoveries. | Never reset on collapse. |
-| `research` | Permanent research levels. | Never reset on collapse. |
-| `expedition` | One selected expedition with an end timestamp and claim state. | Clear only after one successful claim. |
-| `stats` | Lifetime click, rift, collapse and expedition counters. | Used for milestones and UI only. |
-| `settings` | Separate music, effects, haptics and motion preferences. | Retained across collapses. |
+| Data record | Required fields |
+| --- | --- |
+| `SignalDefinition` | `id`, `colour`, `shape`, `motion`, `listenKey`, `compatibility`, `tone` |
+| `AnomalyDefinition` | `id`, `minLinks`, `appearanceKey`, `preserveKey`, `releaseKey`, `memorySeal` |
+| `ConstellationFamily` | `id`, `test(links)`, `nameKey`, `accent`, `unlock` |
+| `LensDefinition` | `id`, `need`, `effect`, `titleKey`, `descriptionKey` |
+| `ChapterDefinition` | `id`, `requiredInsight`, `skyClass`, `signalPool`, `specialRule` |
 
-## Runtime cadence
+## Rendering ownership
 
-The rendering loop remains smooth but no longer rebuilds the entire modal every animation frame. Economic accumulation is updated per frame with a reasonable delta cap. HUD updates are throttled to a visible cadence, while expensive sheets update only after a player action or once per second. Persisting is queued after meaningful actions, on visibility loss and at a modest periodic interval; GamePush cloud synchronization is serialised through the platform bridge.
+`renderField()` owns the field DOM and an SVG thread layer; it runs on state-changing actions only. `renderHud()` updates short, independent labels. `renderSheet()` owns modal content. CSS handles breathing, drift and line draw animations; JavaScript never runs an economy-style full-screen loop. This keeps touch latency steady on lower-power mobile devices.
 
-## Interaction contract
+### Signal component contract
 
-The core is the only required active control. The three dock buttons retain their original semantic roles: Orbits opens the workshop and its new Research tab; Collapse opens the prestige and permanent meta-progression sheet; Dust Quantum triggers a rewarded ad only when the player explicitly asks for it. Contracts and expeditions appear in the stage status strip and open in the existing sheet pattern. The menu retains settings, leaderboard, sharing, favorites, legal information and reset.
+Each signal is a semantic `<button>` with `data-signal-id`, localised `aria-label`, a `.signal-orb` child and a `.signal-glyph` child. CSS type classes make a Beacon look like a needle, Ash look like ember fragments and Mirror look like a lens. All signal buttons have a minimum 48 px touch footprint and equivalent keyboard activation.
 
-## Platform contract
+### Thread component contract
 
-GamePush remains optional during local development. With an active SDK, player synchronization completes before loading cloud progress, the preloader occurs before gameplay, sticky advertising receives its safe bottom area, and `gameStart`/`gameplayStart` signal a loaded, playable game. Pause/resume is relayed to gameplay, feedback and audio. The application also listens to native `visibilitychange` as a fallback.
+The thread layer is an SVG covering the field. It contains one `<path>` per confirmed link and one `<circle>` per endpoint. Coordinates are calculated in field-relative percentages, so portrait and landscape layouts use the same world state. In reduced-motion mode, paths render without the draw animation.
+
+## Atlas and narrative persistence
+
+A resolved field serialises into an `AtlasCard` that captures `seed`, signal IDs, links, pattern family, anomaly decision, chapter, generated title key and timestamp. The card is an interactive data object: it can reopen a read-only map, be compared with a response from a friend, be used as a visual share card and inform future anomaly dialogue.
+
+## Echo challenge protocol
+
+An outgoing Echo contains only a versioned, URL-safe compact payload: `{ v, seed, chapter, sourceFamily, anomalyId }`. It intentionally excludes display name, account ID, cloud state and free-form text. The recipient validates payload shape and version before creating an `Encounter` field. If native share is unavailable, the player can copy the code. If a GamePush social overlay exists, `GPX.invite()` shares a plain-language invitation without assuming a specific social network API.
+
+## Audio and lifecycle
+
+Sound unlocks after the first player gesture. The audio layer receives semantic calls: `listen(signalType)`, `link(family)`, `anomaly(decision)`, `archive()` and `chapter()`. The existing GamePush `pause` and `resume` events, plus visibility fallback, suspend and resume audio and field interaction safely. Audio is never required to understand a signal: every sound has a visual counterpart.
+
+## Platform and moderation contracts
+
+* `gameStart` occurs after boot, field generation, input readiness and first render.
+* `gameplayStart` occurs when a live observation accepts input; `gameplayStop` occurs inside sheets and on pause.
+* Cloud save keeps serialised state in the existing `progress` player field and uses `score` as total completed observations.
+* Rewarded advertising is offered only from a completed record and grants a clearly labelled optional alternate reading; no ad interrupts an observation.
+* The build continues to support RU and EN, portrait, landscape, keyboard operation, safe areas, reduced motion and local fallback.

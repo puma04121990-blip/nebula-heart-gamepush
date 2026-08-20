@@ -3,79 +3,83 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#070b16" />
-  <meta name="description" content="Сердце Туманности — космическая idle-игра с коллапсами, экспедициями и исследованиями." />
+  <meta name="theme-color" content="#080d1d" />
+  <meta name="description" content="Атлас Эха — интерактивная игра-наблюдение о живом ночном небе, созвездиях и личных историях." />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Сердце Туманности</title>
+  <title>Атлас Эха</title>
   <link rel="stylesheet" href="css/style.css" />
-  <link rel="stylesheet" href="css/forms.css" />
 </head>
 <body>
   <div id="boot" aria-live="polite">
-    <div class="boot-mark" aria-hidden="true"></div>
-    <h1 data-i18n="title">Сердце Туманности</h1>
-    <p data-i18n="boot">Настройка ядра…</p>
+    <div class="boot-astrolabe" aria-hidden="true"><i></i><b></b></div>
+    <h1 data-i18n="title">Атлас Эха</h1>
+    <p data-i18n="boot">Открываем обсерваторию…</p>
     <div class="boot-bar" aria-hidden="true"><i id="bootFill"></i></div>
   </div>
 
-  <main id="app" class="hidden" aria-label="Сердце Туманности">
-    <header class="top">
-      <div class="stat stat-dust">
-        <span class="label" data-i18n="dust">Звёздная пыль</span>
-        <strong id="dust" aria-live="polite">0</strong>
+  <main id="app" class="hidden" aria-label="Атлас Эха">
+    <header class="topbar">
+      <button id="btnChapter" class="chapter-chip" type="button" aria-haspopup="dialog">
+        <span class="chapter-kicker" data-i18n="chapter">Глава</span>
+        <strong id="chapterName">Тишина</strong>
+      </button>
+      <div class="top-title" aria-live="polite">
+        <span id="fieldDay">Ночное окно</span>
+        <strong id="fieldCount">0 записей</strong>
       </div>
-      <div class="stat stat-flow">
-        <span class="label" data-i18n="flow">Поток</span>
-        <strong id="rate">0 / сек</strong>
-      </div>
-      <button id="btnMenu" class="icon-btn" type="button" data-i18n-aria="menu" aria-label="Меню" aria-haspopup="dialog">☰</button>
+      <button id="btnMenu" class="menu-btn" type="button" data-i18n-aria="menu" aria-label="Меню" aria-haspopup="dialog">
+        <span></span><span></span><span></span>
+      </button>
     </header>
 
-    <section class="stage" aria-label="Игровое ядро">
-      <button id="btnObjectives" class="activity-card" type="button" aria-haspopup="dialog" data-i18n-aria="objectivesOpen">
-        <span class="activity-kicker" id="activityKicker">Созвездие</span>
-        <strong id="activityTitle">Стабилизация сигнала</strong>
-        <span id="activityMeta">0 / 3</span>
-        <i class="activity-progress"><b id="activityFill"></b></i>
+    <section class="observatory" aria-label="Ночное небо">
+      <button id="btnBrief" class="observation-brief" type="button" aria-haspopup="dialog">
+        <span class="brief-eyebrow" id="briefEyebrow">Наблюдение</span>
+        <strong id="briefTitle">Слушайте небо</strong>
+        <span id="briefMeta">Выберите один сигнал</span>
+        <i class="brief-progress" aria-hidden="true"><b id="briefFill"></b></i>
       </button>
 
-      <div class="stage-meta">
-        <div id="formName">Искра пустоты</div>
-        <div id="tideChip" class="chip">Штиль</div>
-        <div class="evo-row">
-          <span id="evoLabel">Фаза 0%</span>
-          <div class="evo-bar" aria-hidden="true"><i id="evoFill"></i></div>
-        </div>
+      <div id="sky" class="sky" role="group" data-i18n-aria="skyAria" aria-label="Поле наблюдения">
+        <div class="sky-grain" aria-hidden="true"></div>
+        <svg id="threadSvg" class="thread-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div id="signalLayer" class="signal-layer"></div>
+        <button id="anomalyNode" class="anomaly-node hidden" type="button" data-i18n-aria="anomalyAria" aria-label="Аномалия" aria-haspopup="dialog">
+          <span class="anomaly-image" aria-hidden="true"></span>
+          <span class="anomaly-orbit" aria-hidden="true"></span>
+        </button>
+        <div id="fieldPrompt" class="field-prompt" aria-live="polite">Выберите сигнал и прислушайтесь.</div>
       </div>
 
-      <button id="core" type="button" data-form="0" data-i18n-aria="tuneCore" aria-label="Настроить ядро">
-        <span class="halo"></span>
-        <span class="core-corona" aria-hidden="true"></span>
-        <span class="core-body" id="coreBody"></span>
-        <span class="ring r1"></span>
-        <span class="ring r2"></span>
-        <span class="ring r3"></span>
-        <span class="core-sigil" aria-hidden="true"></span>
-        <span class="core-flare" aria-hidden="true"></span>
-      </button>
-      <div id="combo" class="combo hidden" aria-live="polite">резонанс ×1</div>
-      <p id="stageHint" class="stage-hint" data-i18n="stageHint">Касайтесь ядра в одном ритме для резонанса</p>
-      <div id="floatLayer" class="floats" aria-hidden="true"></div>
+      <div class="action-ribbon" role="group" data-i18n-aria="actionsAria" aria-label="Действия наблюдателя">
+        <button id="actListen" class="field-action listen" type="button">
+          <span class="action-icon" aria-hidden="true">◖</span>
+          <span class="action-copy"><strong data-i18n="listen">Слушать</strong><small data-i18n="listenHint">раскрыть голос</small></span>
+        </button>
+        <button id="actConnect" class="field-action connect" type="button">
+          <span class="action-icon" aria-hidden="true">⌇</span>
+          <span class="action-copy"><strong data-i18n="connect">Связать</strong><small data-i18n="connectHint">провести нить</small></span>
+        </button>
+        <button id="actWitness" class="field-action witness" type="button">
+          <span class="action-icon" aria-hidden="true">◉</span>
+          <span class="action-copy"><strong data-i18n="witness">Свидетельствовать</strong><small data-i18n="witnessHint">завершить запись</small></span>
+        </button>
+      </div>
     </section>
 
-    <nav class="dock" aria-label="Основные действия">
-      <button id="btnShop" type="button" data-i18n="orbits" aria-haspopup="dialog">Орбиты</button>
-      <button id="btnCollapse" type="button" data-i18n="collapse" aria-haspopup="dialog">Коллапс</button>
-      <button id="btnReward" type="button" data-i18n="reward">Квант пыли</button>
+    <nav class="atlas-dock" data-i18n-aria="primaryNav" aria-label="Навигация атласа">
+      <button id="btnAtlas" type="button" aria-haspopup="dialog"><span class="dock-icon" aria-hidden="true">▤</span><span data-i18n="atlas">Атлас</span></button>
+      <button id="btnLenses" type="button" aria-haspopup="dialog"><span class="dock-icon" aria-hidden="true">◌</span><span data-i18n="lenses">Линзы</span></button>
+      <button id="btnEncounters" type="button" aria-haspopup="dialog"><span class="dock-icon" aria-hidden="true">↗</span><span data-i18n="encounters">Встречи</span></button>
     </nav>
   </main>
 
   <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" aria-hidden="true">
     <div class="sheet-card" tabindex="-1">
       <div class="sheet-head">
-        <h2 id="sheetTitle">Орбиты</h2>
+        <div><span id="sheetKicker" class="sheet-kicker"></span><h2 id="sheetTitle">Атлас</h2></div>
         <button id="sheetClose" type="button" data-i18n="close">Закрыть</button>
       </div>
       <div id="sheetBody" class="sheet-body"></div>
