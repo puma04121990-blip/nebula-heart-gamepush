@@ -49,12 +49,15 @@
         </div>
       </div>
 
-      <button id="core" type="button" data-i18n-aria="tuneCore" aria-label="Настроить ядро">
+      <button id="core" type="button" data-form="0" data-i18n-aria="tuneCore" aria-label="Настроить ядро">
         <span class="halo"></span>
+        <span class="core-corona" aria-hidden="true"></span>
         <span class="core-body" id="coreBody"></span>
         <span class="ring r1"></span>
         <span class="ring r2"></span>
+        <span class="ring r3"></span>
         <span class="core-sigil" aria-hidden="true"></span>
+        <span class="core-flare" aria-hidden="true"></span>
       </button>
       <div id="combo" class="combo hidden" aria-live="polite">резонанс ×1</div>
       <p id="stageHint" class="stage-hint" data-i18n="stageHint">Касайтесь ядра в одном ритме для резонанса</p>
@@ -79,6 +82,16 @@
   </div>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <div id="ceremony" class="ceremony hidden" role="dialog" aria-modal="true" aria-labelledby="ceremonyTitle" aria-hidden="true">
+    <div class="ceremony-burst" aria-hidden="true"></div>
+    <div class="ceremony-card">
+      <p class="ceremony-kicker" id="ceremonyKicker">Коллапс</p>
+      <h2 id="ceremonyTitle">Ядро переродилось</h2>
+      <p id="ceremonyText"></p>
+      <button id="ceremonyClose" type="button">Продолжить</button>
+    </div>
+  </div>
 
   <script>
     window.GP_PROJECT_ID = '29882';
